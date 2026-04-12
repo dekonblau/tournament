@@ -1,0 +1,183 @@
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  type ReactNode,
+} from 'react';
+import * as api from '../api/client';
+import type { DBSnapshot, FinalStandingsItem, RoundRobinStandingsItem } from '../api/client';
+import type { Stage, Participant, Match, Round } from 'brackets-model';
+
+export type { DBSnapshot };
+
+export interface Tournament {
+  id: number;
+  name: string;
+  createdAt: string;
+}
+
+interface ManagerContextValue {
+  db: DBSnapshot;
+  refresh: () => Promise<void>;
+  tournaments: Tournament[];
+  createTournament: (name: string) => Tournament;
+  deleteTournament: (id: number) => Promise<void>;
+  create: { stage: typeof api.createStage };
+  update: {
+    match: typeof api.updateMatch;
+    matchGame: typeof api.updateMatchGame;
+    seeding: typeof api.updateSeeding;
+    confirmSeeding: typeof api.confirmSeeding;
+    matchChildCount: typeof api.updateMatchChildCount;
+    roundOrdering: typeof api.updateRoundOrdering;
+  };
+  find: {
+    match: typeof api.findMatch;
+    matchGame: typeof api.findMatchGame;
+    nextMatches: typeof api.findNextMatches;
+    previousMatches: typeof api.findPreviousMatches;
+    upperBracket: typeof api.findUpperBracket;
+    loserBracket: typeof api.findLoserBracket;
+  };
+  get: {
+    stageData: typeof api.getStageData;
+    tournamentData: typeof api.getTournamentData;
+    seeding: typeof api.getSeeding;
+    finalStandings: typeof api.getFinalStandings;
+    currentStage: typeof api.getCurrentStage;
+    currentRound: typeof api.getCurrentRound;
+    currentMatches: typeof api.getCurrentMatches;
+    matchGames: typeof api.getMatchGames;
+  };
+  reset: {
+    matchResults: typeof api.resetMatchResults;
+    matchGameResults: typeof api.resetMatchGameResults;
+    seeding: typeof api.resetSeeding;
+  };
+  delete: {
+    stage: typeof api.deleteStage;
+    tournament: typeof api.deleteTournamentStages;
+  };
+  exportData: () => Promise<DBSnapshot>;
+  importData: (data: DBSnapshot, normalizeIds?: boolean) => Promise<void>;
+  getParticipantName: (id: number | null | undefined) => string;
+  getStageMatches: (stageId: number) => Match[];
+  getStageRounds: (stageId: number) => Round[];
+  getStageParticipants: (stage: Stage) => Participant[];
+  getFinalStandings: (stageId: number) => Promise<FinalStandingsItem[]>;
+  getRoundRobinStandings: (stageId: number) => Promise<RoundRobinStandingsItem[]>;
+}
+
+const ManagerContext = createContext<ManagerContextValue | null>(null);
+
+export function ManagerProvider({ children }: { children: ReactNode }) {
+  const [db, setDb] = useState<DBSnapshot>({
+    stage: [], match: [], match_game: [], participant: [], round: [], group: [],
+  });
+
+  const [tournaments, setTournaments] = useState<Tournament[]>(() => {
+    try { return JSON.parse(localStorage.getItem('bm_tournaments') || '[]'); }
+    catch { return []; }
+  });
+
+  const refresh = useCallback(async () => {
+    const data = await api.exportData();
+    setDb(data);
+  }, []);
+
+  const createTournament = useCallback((name: string): Tournament => {
+    const t: Tournament = { id: Date.now(), name, createdAt: new Date().toISOString() };
+    setTournaments((prev) => {
+      const next = [...prev, t];
+      localStorage.setItem('bm_tournaments', JSON.stringify(next));
+      return next;
+    });
+    return t;
+  }, []);
+
+  const deleteTournament = useCallback(async (id: number) => {
+    await api.deleteTournamentStages(id);
+    setTournaments((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      localStorage.setItem('bm_tournaments', JSON.stringify(next));
+      return next;
+    });
+    await refresh();
+  }, [refresh]);
+
+  const exportData = useCallback(() => api.exportData(), []);
+  const importData = useCallback(async (data: DBSnapshot, normalizeIds = false) => {
+    await api.importData(data, normalizeIds);
+    await refresh();
+  }, [refresh]);
+
+  const getParticipantName = useCallback((id: number | null | undefined) => {
+    if (id === null || id === undefined) return 'BYE';
+    return db.participant.find((p) => p.id === id)?.name ?? `#${id}`;
+  }, [db.participant]);
+
+  const getStageMatches      = useCallback((sid: number) => db.match.filter((m) => m.stage_id === sid), [db.match]);
+  const getStageRounds       = useCallback((sid: number) => db.round.filter((r) => r.stage_id === sid), [db.round]);
+  const getStageParticipants = useCallback((stage: Stage) =>
+    db.participant.filter((p) => p.tournament_id === stage.tournament_id), [db.participant]);
+
+  const getFinalStandings = useCallback(async (stageId: number): Promise<FinalStandingsItem[]> => {
+    try { return await api.getFinalStandings(stageId); } catch { return []; }
+  }, []);
+
+  const getRoundRobinStandings = useCallback(async (stageId: number): Promise<RoundRobinStandingsItem[]> => {
+    try { return await api.getRRStandings(stageId); } catch { return []; }
+  }, []);
+
+  const value: ManagerContextValue = {
+    db, refresh, tournaments, createTournament, deleteTournament,
+    create: { stage: api.createStage },
+    update: {
+      match: api.updateMatch,
+      matchGame: api.updateMatchGame,
+      seeding: api.updateSeeding,
+      confirmSeeding: api.confirmSeeding,
+      matchChildCount: api.updateMatchChildCount,
+      roundOrdering: api.updateRoundOrdering,
+    },
+    find: {
+      match: api.findMatch,
+      matchGame: api.findMatchGame,
+      nextMatches: api.findNextMatches,
+      previousMatches: api.findPreviousMatches,
+      upperBracket: api.findUpperBracket,
+      loserBracket: api.findLoserBracket,
+    },
+    get: {
+      stageData: api.getStageData,
+      tournamentData: api.getTournamentData,
+      seeding: api.getSeeding,
+      finalStandings: api.getFinalStandings,
+      currentStage: api.getCurrentStage,
+      currentRound: api.getCurrentRound,
+      currentMatches: api.getCurrentMatches,
+      matchGames: api.getMatchGames,
+    },
+    reset: {
+      matchResults: api.resetMatchResults,
+      matchGameResults: api.resetMatchGameResults,
+      seeding: api.resetSeeding,
+    },
+    delete: {
+      stage: api.deleteStage,
+      tournament: api.deleteTournamentStages,
+    },
+    exportData, importData,
+    getParticipantName, getStageMatches, getStageRounds, getStageParticipants,
+    getFinalStandings, getRoundRobinStandings,
+  };
+
+  return <ManagerContext.Provider value={value}>{children}</ManagerContext.Provider>;
+}
+
+export function useManager() {
+  const ctx = useContext(ManagerContext);
+  if (!ctx) throw new Error('useManager must be used inside <ManagerProvider>');
+  return ctx;
+}
