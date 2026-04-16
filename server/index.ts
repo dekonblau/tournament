@@ -3,7 +3,6 @@ import cors from 'cors';
 import { BracketsManager } from 'brackets-manager';
 import { SqliteStorage } from './SqliteStorage.js';
 import morgan from 'morgan';
-//const morgan = import('morgan');
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3001);
@@ -60,6 +59,61 @@ app.post('/api/stage', wrap(async (req, res) => {
 // UPDATE
 // ═════════════════════════════════════════════════════════════════════════════
 app.patch('/api/match', wrap(async (req, res) => {
+  console.log('[route] PATCH /api/match body:', JSON.stringify(req.body));
+
+  const { id, opponent1, opponent2, status } = req.body;
+
+  // When scores are provided, write them directly to the match_game record
+  // brackets-manager routes scores through match_game when child_count > 0
+  // but loses the parent_id in the process — we handle it explicitly here
+  if (id && (opponent1?.score !== undefined || opponent2?.score !== undefined)) {
+    // Get the existing match_game for this match
+    const existingGame = await storage.selectFirst('match_game', { parent_id: id });
+    console.log('[route] existing match_game:', JSON.stringify(existingGame));
+
+    if (existingGame) {
+      const gameRecord = existingGame as Record<string, unknown>;
+      const updatedGame = {
+        ...gameRecord,
+        status: status ?? gameRecord.status,
+        opponent1: opponent1
+          ? { ...(gameRecord.opponent1 as object ?? {}), ...opponent1 }
+          : gameRecord.opponent1,
+        opponent2: opponent2
+          ? { ...(gameRecord.opponent2 as object ?? {}), ...opponent2 }
+          : gameRecord.opponent2,
+      };
+      console.log('[route] updating match_game:', JSON.stringify(updatedGame));
+      await storage.update('match_game', gameRecord.id as number, updatedGame as never);
+    }
+
+    // Also update the parent match status and opponent result fields
+    const existingMatch = await storage.selectFirst('match', { id });
+    if (existingMatch) {
+      const matchRecord = existingMatch as Record<string, unknown>;
+      const score1 = opponent1?.score ?? (matchRecord.opponent1 as Record<string,unknown>)?.score;
+      const score2 = opponent2?.score ?? (matchRecord.opponent2 as Record<string,unknown>)?.score;
+      const winner = score1 > score2 ? 'opponent1' : score2 > score1 ? 'opponent2' : null;
+
+      const updatedMatch = {
+        ...matchRecord,
+        status: status ?? matchRecord.status,
+        opponent1: {
+          ...(matchRecord.opponent1 as object ?? {}),
+          ...opponent1,
+          result: winner === 'opponent1' ? 'win' : winner ? 'loss' : undefined,
+        },
+        opponent2: {
+          ...(matchRecord.opponent2 as object ?? {}),
+          ...opponent2,
+          result: winner === 'opponent2' ? 'win' : winner ? 'loss' : undefined,
+        },
+      };
+      console.log('[route] updating match directly:', JSON.stringify(updatedMatch));
+      await storage.update('match', id, updatedMatch as never);
+    }
+  }
+
   await manager.update.match(req.body);
   res.json({ ok: true });
 }));
@@ -108,17 +162,26 @@ app.get('/api/stage/:stageId/seeding', wrap(async (req, res) => {
 
 app.get('/api/stage/:stageId/standings', wrap(async (req, res) => {
   const stageId = Number(req.params.stageId);
-  // Pass round-robin scoring options if provided in query
-  const { pointsForWin, pointsForDraw, pointsForLoss } = req.query;
-  if (pointsForWin !== undefined) {
-    const opts = {
-      pointsForWin: Number(pointsForWin),
-      pointsForDraw: Number(pointsForDraw ?? 1),
-      pointsForLoss: Number(pointsForLoss ?? 0),
-    };
-    res.json(await manager.get.finalStandings(stageId, opts));
-  } else {
-    res.json(await manager.get.finalStandings(stageId));
+  try {
+    const { pointsForWin, pointsForDraw, pointsForLoss } = req.query;
+    if (pointsForWin !== undefined) {
+      const opts = {
+        pointsForWin: Number(pointsForWin),
+        pointsForDraw: Number(pointsForDraw ?? 1),
+        pointsForLoss: Number(pointsForLoss ?? 0),
+      };
+      res.json(await manager.get.finalStandings(stageId, opts));
+    } else {
+      res.json(await manager.get.finalStandings(stageId));
+    }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('Not implemented') || msg.includes('not implemented')) {
+      // Return empty standings rather than 400 for unsupported stage types
+      res.json([]);
+    } else {
+      throw e;
+    }
   }
 }));
 

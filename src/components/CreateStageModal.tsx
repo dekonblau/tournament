@@ -83,7 +83,7 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
       if (isElim) {
         settings.grandFinal = grandFinal;
         settings.consolationFinal = consolationFinal;
-        settings.seedOrdering = [seedOrdering, 'natural'];
+        settings.seedOrdering = [seedOrdering];
         settings.balanceByes = balanceByes;
       } else {
         settings.roundRobinMode = rrMode;
