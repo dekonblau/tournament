@@ -164,8 +164,22 @@ export class SqliteStorage implements CrudInterface {
 
   async select<T extends Table>(
     table: T,
-    filter?: Partial<DataTypes[T]>
-  ): Promise<DataTypes[T][] | null> {
+    filter?: Id | Partial<DataTypes[T]>
+  ): Promise<DataTypes[T] | DataTypes[T][] | null> {
+    // CrudInterface overload: select(table, id) must return a single record or null.
+    // select(table, filter) returns an array or null. select(table) returns all.
+    if (typeof filter === 'number' || typeof filter === 'string') {
+      const sql = `SELECT * FROM ${this.tbl(table)} WHERE id = ?`;
+      console.log('[select] by id:', table, filter);
+      try {
+        const row = this.db.prepare(sql).get(filter) as Record<string, unknown> | undefined;
+        return row ? this.deserialize(table, row) as unknown as DataTypes[T] : null;
+      } catch (e) {
+        console.error('[select] FAILED by id:', table, filter, e);
+        throw e;
+      }
+    }
+
     const { clause, values } = this.buildWhere((filter ?? {}) as Record<string, unknown>);
     const sql = `SELECT * FROM ${this.tbl(table)}${clause}`;
 
@@ -174,7 +188,7 @@ export class SqliteStorage implements CrudInterface {
 
     try {
       const rows = this.db.prepare(sql).all(...values) as Record<string, unknown>[];
-      const hasFilter = filter !== undefined && Object.keys(filter).length > 0;
+      const hasFilter = filter !== undefined && Object.keys(filter as object).length > 0;
       if (!rows.length) return hasFilter ? null : [];
       return rows.map((r) => this.deserialize(table, r)) as DataTypes[T][];
     } catch (e) {
@@ -390,8 +404,8 @@ async delete<T extends Table>(table: T, filter?: Partial<DataTypes[T]>): Promise
     console.log('[delete] values:', JSON.stringify(values));
 
     try {
-      const result = this.db.prepare(sql).run(...values);
-      return result.changes > 0;
+      this.db.prepare(sql).run(...values);
+      return true; // success even if 0 rows matched (e.g. no match_games when child_count=0)
     } catch (e) {
       console.error('[delete] FAILED sql:', sql);
       console.error('[delete] FAILED error:', e);
