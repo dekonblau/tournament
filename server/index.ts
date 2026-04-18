@@ -63,13 +63,30 @@ app.patch('/api/match', wrap(async (req, res) => {
 
   const { id, opponent1, opponent2, status } = req.body;
 
-  // When scores are provided, write them directly to the match_game record
-  // brackets-manager routes scores through match_game when child_count > 0
-  // but loses the parent_id in the process — we handle it explicitly here
-  if (id && (opponent1?.score !== undefined || opponent2?.score !== undefined)) {
-    // Get all match_game rows for this match (child_count may be > 1)
+  // Try manager first — it handles advancement, best-of completion, and scores.
+  // Only fall back to direct writes when it fails due to a null/BYE opponent slot.
+  let managerSucceeded = false;
+  try {
+    await manager.update.match(req.body);
+    managerSucceeded = true;
+  } catch (e) {
+    const msg = (e as Error).message ?? String(e);
+    const isBYEError =
+      e instanceof TypeError ||
+      msg.toLowerCase().includes('null') ||
+      msg.toLowerCase().includes('undefined') ||
+      msg.toLowerCase().includes('bye');
+
+    if (!isBYEError) throw e; // real manager error — propagate to caller
+
+    console.warn('[route] manager.update.match failed (BYE/null opponent), falling back to direct writes:', msg);
+  }
+
+  // Direct-write fallback: persist scores when manager couldn't run (null opponent / BYE slot).
+  // This does NOT advance brackets — that only happens when manager succeeds above.
+  if (!managerSucceeded && id !== undefined && (opponent1?.score !== undefined || opponent2?.score !== undefined)) {
     const existingGames = await storage.select('match_game', { parent_id: id });
-    console.log('[route] existing match_games:', JSON.stringify(existingGames));
+    console.log('[route] fallback: existing match_games:', JSON.stringify(existingGames));
 
     if (existingGames && existingGames.length > 0) {
       for (const existingGame of existingGames) {
@@ -84,17 +101,16 @@ app.patch('/api/match', wrap(async (req, res) => {
             ? { ...(gameRecord.opponent2 as object ?? {}), ...opponent2 }
             : gameRecord.opponent2,
         };
-        console.log('[route] updating match_game:', JSON.stringify(updatedGame));
+        console.log('[route] fallback: updating match_game:', JSON.stringify(updatedGame));
         await storage.update('match_game', gameRecord.id as number, updatedGame as never);
       }
     }
 
-    // Also update the parent match status and opponent result fields
     const existingMatch = await storage.selectFirst('match', { id });
     if (existingMatch) {
       const matchRecord = existingMatch as Record<string, unknown>;
-      const score1 = opponent1?.score ?? (matchRecord.opponent1 as Record<string,unknown>)?.score;
-      const score2 = opponent2?.score ?? (matchRecord.opponent2 as Record<string,unknown>)?.score;
+      const score1 = opponent1?.score ?? (matchRecord.opponent1 as Record<string, unknown>)?.score;
+      const score2 = opponent2?.score ?? (matchRecord.opponent2 as Record<string, unknown>)?.score;
       const winner = score1 > score2 ? 'opponent1' : score2 > score1 ? 'opponent2' : null;
 
       const updatedMatch = {
@@ -111,18 +127,11 @@ app.patch('/api/match', wrap(async (req, res) => {
           result: winner === 'opponent2' ? 'win' : winner ? 'loss' : undefined,
         },
       };
-      console.log('[route] updating match directly:', JSON.stringify(updatedMatch));
+      console.log('[route] fallback: updating match directly:', JSON.stringify(updatedMatch));
       await storage.update('match', id, updatedMatch as never);
     }
   }
 
-  try {
-    await manager.update.match(req.body);
-  } catch (e) {
-    // manager.update.match fails when an opponent id is null (BYE / unresolved slot).
-    // The direct writes above already persisted the scores — safe to swallow this.
-    console.warn('[route] manager.update.match skipped (BYE/null opponent):', (e as Error).message);
-  }
   res.json({ ok: true });
 }));
 
@@ -183,13 +192,10 @@ app.get('/api/stage/:stageId/standings', wrap(async (req, res) => {
       res.json(await manager.get.finalStandings(stageId));
     }
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes('Not implemented') || msg.includes('not implemented')) {
-      // Return empty standings rather than 400 for unsupported stage types
-      res.json([]);
-    } else {
-      throw e;
-    }
+    // finalStandings throws for unsupported stage types and for in-progress brackets.
+    // Return empty array so the UI degrades gracefully instead of showing a 400.
+    console.warn('[route] standings unavailable for stage', stageId, '—', (e as Error).message ?? e);
+    res.json([]);
   }
 }));
 
