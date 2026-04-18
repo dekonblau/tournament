@@ -86,3 +86,8 @@ h4 { font-size: 0.8125rem; font-weight: 600; text-transform: uppercase; letter-s
 .brackets-viewer .score { color: var(--text-secondary) !important; font-weight: 600 !important; }
 .brackets-viewer .participant.winner .score { color: var(--green) !important; }
 .brackets-viewer svg line, .brackets-viewer svg polyline { stroke: var(--border-strong) !important; }
+
+/* Match status — color the .opponents border (the actual visible border box) */
+.brackets-viewer [data-match-status="2"] .opponents { border-color: rgba(251,191,36,0.6) !important; }
+.brackets-viewer [data-match-status="3"] .opponents { border-color: rgba(99,102,241,0.7) !important; }
+.brackets-viewer [data-match-status="4"] .opponents { border-color: rgba(52,211,153,0.5) !important; }

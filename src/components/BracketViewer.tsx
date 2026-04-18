@@ -74,18 +74,20 @@ export function BracketViewer({ stages, matches, matchGames, participants, onMat
         { selector: `#${idRef.current}`, clear: true }
       );
 
-      // Attach click handlers to rendered match elements
-      if (onMatchClick) {
-        setTimeout(() => {
-          containerRef.current?.querySelectorAll('.match').forEach((el) => {
-            const matchId = parseInt((el as HTMLElement).dataset.matchId ?? '');
-            if (!isNaN(matchId)) {
-              (el as HTMLElement).style.cursor = 'pointer';
-              (el as HTMLElement).onclick = () => onMatchClick(matchId);
-            }
-          });
-        }, 50);
-      }
+      // Attach click handlers and apply status classes to rendered match elements
+      setTimeout(() => {
+        if (!containerRef.current) return;
+        containerRef.current.querySelectorAll('.match').forEach((el) => {
+          const matchId = parseInt((el as HTMLElement).dataset.matchId ?? '');
+          if (isNaN(matchId)) return;
+
+          if (onMatchClick) {
+            (el as HTMLElement).style.cursor = 'pointer';
+            (el as HTMLElement).onclick = () => onMatchClick(matchId);
+          }
+
+        });
+      }, 50);
     }).catch(() => {
       console.error('Failed to load brackets-viewer from CDN');
     });

@@ -28,7 +28,7 @@ export function MatchUpdateModal({ matchId, onClose }: Props) {
   const [score2, setScore2] = useState(0);
   const [forfeit1, setForfeit1] = useState(false);
   const [forfeit2, setForfeit2] = useState(false);
-  const [status, setStatus] = useState('3');
+  const [status, setStatus] = useState('2');
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [error, setError] = useState('');

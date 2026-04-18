@@ -33,10 +33,15 @@ export function TournamentPage() {
 
   const handleDeleteStage = async () => {
     if (!deleteTarget) return;
-    await del.stage(deleteTarget.id);
-    await refresh();
-    toast(`Stage "${deleteTarget.name}" deleted`, 'info');
+    const target = deleteTarget;
     setDeleteTarget(null);
+    try {
+      await del.stage(Number(target.id));
+      await refresh();
+      toast(`Stage "${target.name}" deleted`, 'info');
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : 'Failed to delete stage', 'error');
+    }
   };
 
   return (
