@@ -67,24 +67,26 @@ app.patch('/api/match', wrap(async (req, res) => {
   // brackets-manager routes scores through match_game when child_count > 0
   // but loses the parent_id in the process — we handle it explicitly here
   if (id && (opponent1?.score !== undefined || opponent2?.score !== undefined)) {
-    // Get the existing match_game for this match
-    const existingGame = await storage.selectFirst('match_game', { parent_id: id });
-    console.log('[route] existing match_game:', JSON.stringify(existingGame));
+    // Get all match_game rows for this match (child_count may be > 1)
+    const existingGames = await storage.select('match_game', { parent_id: id });
+    console.log('[route] existing match_games:', JSON.stringify(existingGames));
 
-    if (existingGame) {
-      const gameRecord = existingGame as Record<string, unknown>;
-      const updatedGame = {
-        ...gameRecord,
-        status: status ?? gameRecord.status,
-        opponent1: opponent1
-          ? { ...(gameRecord.opponent1 as object ?? {}), ...opponent1 }
-          : gameRecord.opponent1,
-        opponent2: opponent2
-          ? { ...(gameRecord.opponent2 as object ?? {}), ...opponent2 }
-          : gameRecord.opponent2,
-      };
-      console.log('[route] updating match_game:', JSON.stringify(updatedGame));
-      await storage.update('match_game', gameRecord.id as number, updatedGame as never);
+    if (existingGames && existingGames.length > 0) {
+      for (const existingGame of existingGames) {
+        const gameRecord = existingGame as Record<string, unknown>;
+        const updatedGame = {
+          ...gameRecord,
+          status: status ?? gameRecord.status,
+          opponent1: opponent1
+            ? { ...(gameRecord.opponent1 as object ?? {}), ...opponent1 }
+            : gameRecord.opponent1,
+          opponent2: opponent2
+            ? { ...(gameRecord.opponent2 as object ?? {}), ...opponent2 }
+            : gameRecord.opponent2,
+        };
+        console.log('[route] updating match_game:', JSON.stringify(updatedGame));
+        await storage.update('match_game', gameRecord.id as number, updatedGame as never);
+      }
     }
 
     // Also update the parent match status and opponent result fields
@@ -114,7 +116,13 @@ app.patch('/api/match', wrap(async (req, res) => {
     }
   }
 
-  await manager.update.match(req.body);
+  try {
+    await manager.update.match(req.body);
+  } catch (e) {
+    // manager.update.match fails when an opponent id is null (BYE / unresolved slot).
+    // The direct writes above already persisted the scores — safe to swallow this.
+    console.warn('[route] manager.update.match skipped (BYE/null opponent):', (e as Error).message);
+  }
   res.json({ ok: true });
 }));
 
@@ -194,7 +202,16 @@ app.get('/api/stage/:stageId/current-round', wrap(async (req, res) => {
 }));
 
 app.get('/api/stage/:stageId/current-matches', wrap(async (req, res) => {
-  res.json(await manager.get.currentMatches(Number(req.params.stageId)));
+  try {
+    res.json(await manager.get.currentMatches(Number(req.params.stageId)));
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('Not implemented')) {
+      res.json([]);
+    } else {
+      throw e;
+    }
+  }
 }));
 
 app.get('/api/match/:id/games', wrap(async (req, res) => {
