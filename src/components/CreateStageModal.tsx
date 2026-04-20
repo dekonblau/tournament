@@ -23,6 +23,15 @@ const GRAND_FINAL_OPTIONS = [
   { value: 'double', label: 'Double (best-of-2 bracket)' },
 ];
 
+const BRACKET_SIZE_OPTIONS = [
+  { value: '0',  label: 'Auto (next power of 2)' },
+  { value: '4',  label: '4 players' },
+  { value: '8',  label: '8 players' },
+  { value: '16', label: '16 players' },
+  { value: '32', label: '32 players' },
+  { value: '64', label: '64 players' },
+];
+
 const SEED_ORDERING_OPTIONS = [
   { value: 'natural', label: 'Natural (1v2, 3v4…)' },
   { value: 'inner_outer', label: 'Inner/Outer (1v16, 2v15…)' },
@@ -54,6 +63,7 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
   const [matchesChildCount, setMatchesChildCount] = useState(0);
   const [seedOrdering, setSeedOrdering] = useState('inner_outer');
   const [balanceByes, setBalanceByes] = useState(true);
+  const [bracketSize, setBracketSize] = useState(0);
   const [rrMode, setRrMode] = useState<'simple' | 'double'>('simple');
   const [groupCount, setGroupCount] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -62,20 +72,25 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
   const participants = participantsRaw.split('\n').map((s) => s.trim()).filter(Boolean);
   const isElim = type !== 'round_robin';
 
-  // For elimination: pad to next power of 2
+  // Auto-reset bracketSize if it's now smaller than the participant count
+  const effectiveBracketSize = bracketSize > 0 && bracketSize < participants.length ? 0 : bracketSize;
+
+  // For elimination: pad to chosen size (always a power of 2)
   let seeding: (string | null)[] = participants;
-  let byeCount = 0;
+  let totalSlots = participants.length;
+  let tbdCount = 0;
   if (isElim && participants.length >= 2) {
-    const size = nextPow2(participants.length);
-    byeCount = size - participants.length;
-    seeding = [...participants, ...Array(byeCount).fill(null)];
+    const autoSize = nextPow2(participants.length);
+    const requestedSize = effectiveBracketSize > 0 ? effectiveBracketSize : autoSize;
+    totalSlots = nextPow2(Math.max(requestedSize, participants.length));
+    tbdCount = totalSlots - participants.length;
+    seeding = [...participants, ...Array(tbdCount).fill(null)];
   }
 
   const handleSubmit = async () => {
     setError('');
     if (!name.trim()) return setError('Stage name is required');
     if (participants.length < 2) return setError('At least 2 participants required');
-    if (isElim && participants.length < 2) return setError('Need at least 2 participants for elimination');
 
     setLoading(true);
     try {
@@ -103,7 +118,7 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
       toast(`Stage "${name.trim()}" created`, 'success');
       onClose();
       // reset
-      setName(''); setType('single_elimination');
+      setName(''); setType('single_elimination'); setBracketSize(0);
       setParticipantsRaw('Team Alpha\nTeam Beta\nTeam Gamma\nTeam Delta\nTeam Epsilon\nTeam Zeta\nTeam Eta\nTeam Theta');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to create stage');
@@ -141,13 +156,25 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
           options={FORMAT_OPTIONS}
         />
 
+        {isElim && (
+          <Select
+            label="Bracket size"
+            value={String(effectiveBracketSize)}
+            onChange={(e) => setBracketSize(Number(e.target.value))}
+            options={BRACKET_SIZE_OPTIONS.filter(
+              (o) => o.value === '0' || Number(o.value) >= participants.length
+            )}
+            hint="Set a fixed size to leave TBD slots for unknown participants"
+          />
+        )}
+
         <Textarea
-          label="Participants (one per line)"
+          label="Participants (one per line, leave blank lines or omit for TBD)"
           value={participantsRaw}
           onChange={(e) => setParticipantsRaw(e.target.value)}
           hint={
             isElim && participants.length >= 2
-              ? `${participants.length} participants → padded to ${nextPow2(participants.length)} slots (${byeCount} BYEs added)`
+              ? `${participants.length} known + ${tbdCount} TBD = ${totalSlots} total slots`
               : `${participants.length} participant${participants.length !== 1 ? 's' : ''}`
           }
           style={{ minHeight: '120px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}

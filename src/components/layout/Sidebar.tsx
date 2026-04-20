@@ -8,7 +8,12 @@ import { useManager } from '../../store/managerContext';
 import { useToast, Confirm, SectionLabel } from '../ui/index';
 import { Button } from '../ui/Button';
 
-export function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
+
+export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const { tournaments, db, createTournament, deleteTournament, exportData, importData, refresh } = useManager();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -83,16 +88,19 @@ export function Sidebar() {
         onCancel={() => setDeleteTarget(null)}
       />
 
-      <aside style={{
-        width: collapsed ? 56 : 240,
-        minWidth: collapsed ? 56 : 240,
-        background: 'var(--bg-surface)',
-        borderRight: '1px solid var(--border)',
-        display: 'flex',
-        flexDirection: 'column',
-        transition: 'width 0.2s, min-width 0.2s',
-        overflow: 'hidden',
-      }}>
+      <aside
+        className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}
+        style={{
+          width: collapsed ? 56 : 240,
+          minWidth: collapsed ? 56 : 240,
+          background: 'var(--bg-surface)',
+          borderRight: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          transition: 'width 0.2s, min-width 0.2s, transform 0.25s',
+          overflow: 'hidden',
+        }}
+      >
         {/* Logo */}
         <div style={{
           padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px',
@@ -125,7 +133,7 @@ export function Sidebar() {
 
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '12px 8px' }}>
           {/* Nav */}
-          <NavItem icon={<LayoutDashboard size={15} />} label="Dashboard" to="/" collapsed={collapsed} active={location.pathname === '/'} />
+          <NavItem icon={<LayoutDashboard size={15} />} label="Dashboard" to="/" collapsed={collapsed} active={location.pathname === '/'} onNavigate={onMobileClose} />
 
           {/* Tournaments */}
           {!collapsed && (
@@ -153,6 +161,7 @@ export function Sidebar() {
                 to={`/tournament/${t.id}`}
                 collapsed={collapsed}
                 active={activeTournamentId === String(t.id)}
+                onNavigate={onMobileClose}
               />
               {!collapsed && (
                 <button
@@ -236,11 +245,11 @@ export function Sidebar() {
   );
 }
 
-function NavItem({ icon, label, to, collapsed, active }: { icon: React.ReactNode; label: string; to: string; collapsed: boolean; active: boolean }) {
+function NavItem({ icon, label, to, collapsed, active, onNavigate }: { icon: React.ReactNode; label: string; to: string; collapsed: boolean; active: boolean; onNavigate?: () => void }) {
   const navigate = useNavigate();
   return (
     <button
-      onClick={() => navigate(to)}
+      onClick={() => { navigate(to); onNavigate?.(); }}
       title={collapsed ? label : undefined}
       style={{
         display: 'flex', alignItems: 'center', gap: '9px', width: '100%',

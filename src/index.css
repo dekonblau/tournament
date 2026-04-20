@@ -87,6 +87,53 @@ h4 { font-size: 0.8125rem; font-weight: 600; text-transform: uppercase; letter-s
 .brackets-viewer .participant.winner .score { color: var(--green) !important; }
 .brackets-viewer svg line, .brackets-viewer svg polyline { stroke: var(--border-strong) !important; }
 
+/* ── App shell (desktop) ────────────────────────────────────────────────────── */
+.app-shell { display: flex; flex-direction: column; height: 100%; height: 100dvh; overflow: hidden; }
+.app-body  { display: flex; flex: 1; overflow: hidden; position: relative; }
+.app-main  { flex: 1; overflow-y: auto; display: flex; flex-direction: column; min-width: 0; }
+
+.mobile-header { display: none; }
+.mobile-overlay { display: none; }
+.hamburger { display: none; }
+
+/* ── Responsive: mobile (≤767px) ───────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Sticky top bar with hamburger */
+  .mobile-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; position: sticky; top: 0; z-index: 100;
+    background: var(--bg-surface); border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .hamburger {
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm); color: var(--text-secondary);
+    padding: 6px; cursor: pointer;
+  }
+  .mobile-title {
+    font-size: 14px; font-weight: 700; letter-spacing: -0.3px; color: var(--text-primary);
+  }
+
+  /* Sidebar becomes a fixed drawer */
+  .sidebar {
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    width: 240px !important; min-width: 240px !important;
+    z-index: 300;
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-lg);
+  }
+  .sidebar.mobile-open { transform: translateX(0); }
+
+  /* Dim overlay behind drawer */
+  .mobile-overlay {
+    display: block; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55); z-index: 200;
+    backdrop-filter: blur(2px);
+  }
+}
+
 /* Match status — color the .opponents border (the actual visible border box) */
 .brackets-viewer [data-match-status="2"] .opponents { border-color: rgba(251,191,36,0.6) !important; }
 .brackets-viewer [data-match-status="3"] .opponents { border-color: rgba(99,102,241,0.7) !important; }
