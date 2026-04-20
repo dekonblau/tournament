@@ -3,6 +3,7 @@
 
 /* ── Design tokens ─────────────────────────────────────────────────────────── */
 :root {
+  color-scheme: dark;
   --bg-base:        #0c0e14;
   --bg-surface:     #13161f;
   --bg-elevated:    #1a1e2b;
@@ -63,6 +64,10 @@ h1 { font-size: 1.5rem;  font-weight: 700; letter-spacing: -0.5px; }
 h2 { font-size: 1.125rem; font-weight: 600; letter-spacing: -0.3px; }
 h3 { font-size: 0.9375rem; font-weight: 600; }
 h4 { font-size: 0.8125rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); }
+
+/* ── Number input spinners ─────────────────────────────────────────────────── */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: auto; opacity: 1; }
 
 /* ── Scrollbar ─────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }

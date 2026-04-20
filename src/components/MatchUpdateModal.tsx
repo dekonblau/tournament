@@ -18,6 +18,57 @@ const STATUS_OPTIONS = [
   { value: '4', label: 'Completed' },
 ];
 
+
+function ScoreInput({ value, onChange, winner, disabled }: {
+  value: number; onChange: (v: number) => void; winner: boolean; disabled: boolean;
+}) {
+  const [text, setText] = React.useState(String(value));
+  React.useEffect(() => { setText(String(value)); }, [value]);
+
+  const bg = winner ? 'var(--green-dim)' : 'var(--bg-elevated)';
+  const border = winner ? 'rgba(52,211,153,0.3)' : 'var(--border-strong)';
+  const color = winner ? 'var(--green)' : 'var(--text-primary)';
+
+  const commit = (s: string) => {
+    const n = parseInt(s, 10);
+    const safe = Number.isNaN(n) || n < 0 ? 0 : n;
+    onChange(safe);
+    setText(String(safe));
+  };
+
+  const spinBtn: React.CSSProperties = {
+    position: 'absolute', right: 0, width: 28, height: '50%',
+    background: 'transparent', border: 'none', color: 'var(--text-secondary)',
+    cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '9px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    userSelect: 'none',
+  };
+
+  return (
+    <div style={{ position: 'relative', minWidth: 0 }}>
+      <input
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={text}
+        onChange={(e) => setText(e.target.value.replace(/[^0-9]/g, ''))}
+        onBlur={(e) => commit(e.target.value)}
+        disabled={disabled}
+        style={{
+          width: '100%', textAlign: 'center', fontSize: '28px', fontWeight: 700,
+          background: bg, border: `1px solid ${border}`, borderRadius: 'var(--radius-md)',
+          color, padding: '10px 28px 10px 8px', outline: 'none', fontFamily: 'var(--font-sans)',
+          boxSizing: 'border-box',
+        }}
+      />
+      <button type="button" disabled={disabled} onClick={() => { onChange(value + 1); setText(String(value + 1)); }}
+        style={{ ...spinBtn, top: 0, borderBottom: `1px solid ${border}`, borderRadius: '0 var(--radius-md) 0 0' }}>▲</button>
+      <button type="button" disabled={disabled} onClick={() => { const v = Math.max(0, value - 1); onChange(v); setText(String(v)); }}
+        style={{ ...spinBtn, bottom: 0, borderRadius: '0 0 var(--radius-md) 0' }}>▼</button>
+    </div>
+  );
+}
+
 export function MatchUpdateModal({ matchId, onClose }: Props) {
   const { db, update, reset, refresh, getParticipantName } = useManager();
   const { toast } = useToast();
@@ -136,48 +187,22 @@ export function MatchUpdateModal({ matchId, onClose }: Props) {
           <>
             {/* Score grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '12px' }}>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: '13px', fontWeight: 500, textAlign: 'center', marginBottom: '8px', color: winner === 'p1' ? 'var(--green)' : 'var(--text-primary)' }}>
                   {p1Name}
                 </div>
-                <input
-                  type="number"
-                  min={0}
-                  value={score1}
-                  onChange={(e) => setScore1(Math.max(0, parseInt(e.target.value) || 0))}
-                  disabled={!canEdit}
-                  style={{
-                    width: '100%', textAlign: 'center', fontSize: '28px', fontWeight: 700,
-                    background: winner === 'p1' ? 'var(--green-dim)' : 'var(--bg-elevated)',
-                    border: `1px solid ${winner === 'p1' ? 'rgba(52,211,153,0.3)' : 'var(--border-strong)'}`,
-                    borderRadius: 'var(--radius-md)', color: winner === 'p1' ? 'var(--green)' : 'var(--text-primary)',
-                    padding: '12px', outline: 'none', fontFamily: 'var(--font-sans)',
-                  }}
-                />
+                <ScoreInput value={score1} onChange={setScore1} winner={winner === 'p1'} disabled={!canEdit} />
               </div>
 
               <div style={{ color: 'var(--text-muted)', fontSize: '16px', fontWeight: 700, textAlign: 'center' }}>
                 VS
               </div>
 
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: '13px', fontWeight: 500, textAlign: 'center', marginBottom: '8px', color: winner === 'p2' ? 'var(--green)' : 'var(--text-primary)' }}>
                   {p2Name}
                 </div>
-                <input
-                  type="number"
-                  min={0}
-                  value={score2}
-                  onChange={(e) => setScore2(Math.max(0, parseInt(e.target.value) || 0))}
-                  disabled={!canEdit}
-                  style={{
-                    width: '100%', textAlign: 'center', fontSize: '28px', fontWeight: 700,
-                    background: winner === 'p2' ? 'var(--green-dim)' : 'var(--bg-elevated)',
-                    border: `1px solid ${winner === 'p2' ? 'rgba(52,211,153,0.3)' : 'var(--border-strong)'}`,
-                    borderRadius: 'var(--radius-md)', color: winner === 'p2' ? 'var(--green)' : 'var(--text-primary)',
-                    padding: '12px', outline: 'none', fontFamily: 'var(--font-sans)',
-                  }}
-                />
+                <ScoreInput value={score2} onChange={setScore2} winner={winner === 'p2'} disabled={!canEdit} />
               </div>
             </div>
 
