@@ -58,7 +58,7 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
 
   const [name, setName] = useState('');
   const [type, setType] = useState<StageType>('single_elimination');
-  const [participantsRaw, setParticipantsRaw] = useState('Team Alpha\nTeam Beta\nTeam Gamma\nTeam Delta\nTeam Epsilon\nTeam Zeta\nTeam Eta\nTeam Theta');
+  const [participantsRaw, setParticipantsRaw] = useState('');
   const [grandFinal, setGrandFinal] = useState<'simple' | 'double'>('simple');
   const [consolationFinal, setConsolationFinal] = useState(false);
   const [matchesChildCount, setMatchesChildCount] = useState(0);
