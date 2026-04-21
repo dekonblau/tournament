@@ -103,8 +103,12 @@ export function MatchUpdateModal({ matchId, onClose }: Props) {
   };
   const p1Name = oppLabel(match.opponent1);
   const p2Name = oppLabel(match.opponent2);
-  const isBye = match.opponent1 == null || match.opponent2 == null ||
-    match.opponent1.id == null || match.opponent2.id == null;
+  // A true BYE has opponent === null (SQL null). {id:null} means locked —
+  // waiting for a previous match's winner to advance here.
+  const isBye = match.opponent1 === null || match.opponent2 === null;
+  const isLocked = !isBye && (
+    match.opponent1?.id == null || match.opponent2?.id == null
+  );
   const canEdit = (match.status ?? 0) >= 2;
 
   const winner = score1 > score2 ? 'p1' : score2 > score1 ? 'p2' : forfeit1 ? 'p2' : forfeit2 ? 'p1' : null;
@@ -170,7 +174,7 @@ export function MatchUpdateModal({ matchId, onClose }: Props) {
             </Button>
           )}
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" loading={loading} onClick={handleUpdate} disabled={!canEdit || isBye}>
+          <Button variant="primary" loading={loading} onClick={handleUpdate} disabled={!canEdit || isBye || isLocked}>
             Save Result
           </Button>
         </>
@@ -186,6 +190,11 @@ export function MatchUpdateModal({ matchId, onClose }: Props) {
         {isBye && (
           <div style={{ textAlign: 'center', padding: '12px', background: 'var(--amber-dim)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 'var(--radius-md)', color: 'var(--amber)', fontSize: '13px' }}>
             This match has a BYE — no result needed
+          </div>
+        )}
+        {isLocked && (
+          <div style={{ textAlign: 'center', padding: '12px', background: 'var(--bg-overlay)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '13px' }}>
+            Waiting for previous matches to complete
           </div>
         )}
 

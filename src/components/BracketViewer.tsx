@@ -150,11 +150,14 @@ export function BracketViewer({ stages, matches, matchGames, participants, onMat
             const isByeClass = nameEl.classList.contains('bye');
             if (!isEmpty && !isByeClass) return;
 
+            // Only label null opponents (true BYEs). {id:null} slots are locked
+            // matches waiting for advancement — leave them blank so they don't
+            // mislead as "TBD" (unassigned participant).
             const isBye = opp === null || isByeClass;
-            nameEl.textContent = isBye ? 'BYE' : 'TBD';
+            if (!isBye) return;
+            nameEl.textContent = 'BYE';
             nameEl.style.fontStyle = 'italic';
             nameEl.style.opacity = '0.65';
-            if (!isBye) nameEl.style.color = 'rgba(245,158,11,0.9)';
           });
         });
       }, 50);
