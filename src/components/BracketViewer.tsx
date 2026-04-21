@@ -127,6 +127,36 @@ export function BracketViewer({ stages, matches, matchGames, participants, onMat
           }
           label.textContent = labelMap.get(matchId) ?? '';
         });
+
+        // Inject TBD/BYE text for empty participant slots.
+        // {id:null} TBD slots render blank; null BYE slots get "BYE" from the library
+        // but in our dark theme the library's light-theme color makes it invisible.
+        containerRef.current.querySelectorAll('.match').forEach((matchEl) => {
+          const mid = parseInt((matchEl as HTMLElement).dataset.matchId ?? '');
+          if (isNaN(mid)) return;
+          const match = matches.find((m) => (m.id as number) === mid);
+          if (!match) return;
+
+          const participantEls = matchEl.querySelectorAll('.participant');
+          const opps = [match.opponent1, match.opponent2] as (null | { id: number | null })[];
+
+          participantEls.forEach((pEl, idx) => {
+            if (idx >= 2) return;
+            const opp = opps[idx];
+            const nameEl = pEl.querySelector('.name') as HTMLElement | null;
+            if (!nameEl) return;
+
+            const isEmpty = !nameEl.textContent?.trim();
+            const isByeClass = nameEl.classList.contains('bye');
+            if (!isEmpty && !isByeClass) return;
+
+            const isBye = opp === null || isByeClass;
+            nameEl.textContent = isBye ? 'BYE' : 'TBD';
+            nameEl.style.fontStyle = 'italic';
+            nameEl.style.opacity = '0.65';
+            if (!isBye) nameEl.style.color = 'rgba(245,158,11,0.9)';
+          });
+        });
       }, 50);
     }).catch(() => {
       console.error('Failed to load brackets-viewer from CDN');
