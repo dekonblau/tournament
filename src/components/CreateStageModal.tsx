@@ -67,8 +67,8 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
   const [bracketSize, setBracketSize] = useState(0);
   const [rrMode, setRrMode] = useState<'simple' | 'double'>('simple');
   const [groupCount, setGroupCount] = useState(1);
-  const [groupCountRaw, setGroupCountRaw] = useState('1');
-  const [matchesChildCountRaw, setMatchesChildCountRaw] = useState('0');
+  const [groupCountRaw, setGroupCountRaw] = useState('');
+  const [matchesChildCountRaw, setMatchesChildCountRaw] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -110,22 +110,32 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
       }
       if (matchesChildCount > 0) settings.matchesChildCount = matchesChildCount;
 
-      // Create stage with size but no seeding — this leaves all slots as TBD
-      // (no BYEs pre-assigned). Then call update.seeding to assign the known
-      // participants; BYEs are only processed when the tournament is started
-      // (via confirmSeeding).
-      const stage = await create.stage({
-        name: name.trim(),
-        tournamentId,
-        type,
-        settings,
-      });
-      if (participants.length > 0) {
-        const fullSeeding: (string | null)[] = [
-          ...participants,
-          ...Array(tbdCount).fill(null),
-        ];
-        await updateSeeding(stage.id as number, fullSeeding);
+      // Round robin: pass seeding directly — no TBD mechanism needed.
+      // Elimination: create with size only (all TBD), then call updateSeeding
+      // to assign known participants; BYEs only processed on tournament start.
+      let stage;
+      if (!isElim) {
+        stage = await create.stage({
+          name: name.trim(),
+          tournamentId,
+          type,
+          seeding: participants,
+          settings,
+        });
+      } else {
+        stage = await create.stage({
+          name: name.trim(),
+          tournamentId,
+          type,
+          settings,
+        });
+        if (participants.length > 0) {
+          const fullSeeding: (string | null)[] = [
+            ...participants,
+            ...Array(tbdCount).fill(null),
+          ];
+          await updateSeeding(stage.id as number, fullSeeding);
+        }
       }
 
       await refresh();
@@ -237,25 +247,27 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
               onBlur={() => {
                 const n = Math.max(1, parseInt(groupCountRaw) || 1);
                 setGroupCount(n);
-                setGroupCountRaw(String(n));
+                setGroupCountRaw(groupCountRaw.trim() ? String(n) : '');
               }}
-              hint="Split participants into multiple round-robin groups"
+              placeholder="1"
+              hint="Leave blank for 1 group (all participants together)"
             />
           </>
         )}
 
         {/* Match child count (best-of-N) */}
         <Input
-          label="Best-of (match games per match, 0 = single match)"
+          label="Best-of"
           type="number"
           value={matchesChildCountRaw}
           onChange={(e) => setMatchesChildCountRaw(e.target.value)}
           onBlur={() => {
             const n = Math.max(0, parseInt(matchesChildCountRaw) || 0);
             setMatchesChildCount(n);
-            setMatchesChildCountRaw(String(n));
+            setMatchesChildCountRaw(matchesChildCountRaw.trim() ? String(n) : '');
           }}
-          hint="Set to 3 for best-of-3, 5 for best-of-5, etc."
+          placeholder="0"
+          hint="Leave blank for single match; set to 3 for best-of-3, 5 for best-of-5, etc."
         />
 
         {error && (
