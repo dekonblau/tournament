@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Stage, Match, MatchGame, Participant } from 'brackets-model';
 
 interface BracketViewerProps {
@@ -74,9 +74,35 @@ export function BracketViewer({ stages, matches, matchGames, participants, onMat
         { selector: `#${idRef.current}`, clear: true }
       );
 
-      // Attach click handlers and apply status classes to rendered match elements
+      // Attach click handlers and inject match labels
       setTimeout(() => {
         if (!containerRef.current) return;
+
+        // Build label map: matchId → "WB 1.1" / "LB 2.3" / "GF 1.1"
+        const isDouble = stages.some(s => s.type === 'double_elimination');
+        const sortedGroupIds = Array.from(new Set(matches.map(m => m.group_id as number))).sort((a, b) => a - b);
+        const groupPrefix = (gid: number) => {
+          if (!isDouble || sortedGroupIds.length === 1) return '';
+          const idx = sortedGroupIds.indexOf(gid);
+          if (idx === 0) return 'WB ';
+          if (idx === sortedGroupIds.length - 1 && sortedGroupIds.length > 2) return 'GF ';
+          return 'LB ';
+        };
+        const groupRounds = new Map<number, number[]>();
+        for (const m of matches) {
+          const gid = m.group_id as number;
+          if (!groupRounds.has(gid)) groupRounds.set(gid, []);
+          const arr = groupRounds.get(gid)!;
+          if (!arr.includes(m.round_id as number)) arr.push(m.round_id as number);
+        }
+        groupRounds.forEach(arr => arr.sort((a, b) => a - b));
+        const labelMap = new Map<number, string>();
+        for (const m of matches) {
+          const gid = m.group_id as number;
+          const roundIdx = groupRounds.get(gid)!.indexOf(m.round_id as number) + 1;
+          labelMap.set(m.id as number, `${groupPrefix(gid)}${roundIdx}.${m.number}`);
+        }
+
         containerRef.current.querySelectorAll('.match').forEach((el) => {
           const matchId = parseInt((el as HTMLElement).dataset.matchId ?? '');
           if (isNaN(matchId)) return;
@@ -86,6 +112,20 @@ export function BracketViewer({ stages, matches, matchGames, participants, onMat
             (el as HTMLElement).onclick = () => onMatchClick(matchId);
           }
 
+          const opponents = el.querySelector('.opponents') as HTMLElement | null;
+          if (!opponents) return;
+
+          // Re-use existing injected label or replace the native library span
+          let label = opponents.querySelector('.bm-label') as HTMLElement | null;
+          if (!label) {
+            // Remove any native label span the library rendered (no class, direct child span)
+            const nativeSpan = opponents.querySelector(':scope > span:not(.bm-label)') as HTMLElement | null;
+            if (nativeSpan) nativeSpan.remove();
+            label = document.createElement('span');
+            label.className = 'bm-label';
+            opponents.insertBefore(label, opponents.firstChild);
+          }
+          label.textContent = labelMap.get(matchId) ?? '';
         });
       }, 50);
     }).catch(() => {

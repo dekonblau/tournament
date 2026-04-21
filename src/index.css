@@ -84,7 +84,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: auto; opacit
 }
 .brackets-viewer .bracket-label,
 .brackets-viewer .round-label { color: var(--text-muted) !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: 0.8px !important; }
-.brackets-viewer .match-label { color: var(--text-muted) !important; font-size: 10px !important; }
+.brackets-viewer .match-label { font-size: 10px !important; }
 .brackets-viewer .participant { background: var(--bg-overlay) !important; color: var(--text-primary) !important; border-color: var(--border) !important; font-size: 13px !important; }
 .brackets-viewer .participant.winner { background: var(--green-dim) !important; color: var(--green) !important; border-color: rgba(52,211,153,0.2) !important; }
 .brackets-viewer .participant.loss { opacity: 0.5; }
@@ -137,6 +137,22 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance: auto; opacit
     background: rgba(0,0,0,0.55); z-index: 200;
     backdrop-filter: blur(2px);
   }
+}
+
+/* Match number labels injected on top of .opponents border */
+.brackets-viewer .opponents { overflow: visible !important; }
+.bm-label {
+  position: absolute;
+  top: -9px; left: 4px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.3px;
+  color: rgba(255,255,255,0.9);
+  background: var(--bg-overlay);
+  padding: 0 4px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 5;
+  line-height: 1.4;
+  font-family: var(--font-mono);
 }
 
 /* Match status — color the .opponents border (the actual visible border box) */

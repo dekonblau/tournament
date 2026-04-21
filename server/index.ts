@@ -18,6 +18,11 @@ const manager = new BracketsManager(storage);
 
 console.log(`[server] SQLite database: ${DB_PATH}`);
 
+// ─── Export cache (invalidated on any write) ──────────────────────────────────
+let exportCache: { data: unknown; ts: number } | null = null;
+const EXPORT_TTL_MS = 500;
+app.use((_req, _res, next) => { if (_req.method !== 'GET') exportCache = null; next(); });
+
 // ─── Error handler helper ─────────────────────────────────────────────────────
 function wrap(fn: (req: Request, res: Response) => Promise<unknown>) {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -35,7 +40,13 @@ function wrap(fn: (req: Request, res: Response) => Promise<unknown>) {
 // GET  /api/export          — full database export (used to seed the viewer)
 // ═════════════════════════════════════════════════════════════════════════════
 app.get('/api/export', wrap(async (_req, res) => {
-  res.json(await manager.export());
+  const now = Date.now();
+  if (exportCache && now - exportCache.ts < EXPORT_TTL_MS) {
+    return res.json(exportCache.data);
+  }
+  const data = await manager.export();
+  exportCache = { data, ts: now };
+  res.json(data);
 }));
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -129,6 +140,26 @@ app.patch('/api/match', wrap(async (req, res) => {
       };
       console.log('[route] fallback: updating match directly:', JSON.stringify(updatedMatch));
       await storage.update('match', id, updatedMatch as never);
+    }
+  }
+
+  // For child_count > 0 matches, sync scores/results to each match_game record.
+  // manager.update.match only writes status/result to games, not raw scores.
+  if (managerSucceeded && id !== undefined) {
+    const parentRec = await storage.selectFirst('match', { id }) as Record<string, unknown> | null;
+    if (parentRec && (parentRec.child_count as number) > 0) {
+      const games = await storage.select('match_game', { parent_id: id });
+      if (Array.isArray(games)) {
+        for (const game of games) {
+          const g = game as unknown as Record<string, unknown>;
+          await storage.update('match_game', g.id as number, {
+            ...g,
+            status: status ?? g.status,
+            opponent1: opponent1 ? { ...(g.opponent1 as object ?? {}), ...opponent1 } : g.opponent1,
+            opponent2: opponent2 ? { ...(g.opponent2 as object ?? {}), ...opponent2 } : g.opponent2,
+          } as never);
+        }
+      }
     }
   }
 
