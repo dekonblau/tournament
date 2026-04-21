@@ -45,6 +45,14 @@ app.get('/api/tournaments', wrap(async (_req, res) => {
   res.json(db.prepare('SELECT * FROM tournament ORDER BY id ASC').all());
 }));
 
+app.get('/api/tournament/:id/stages', wrap(async (req, res) => {
+  res.json(db.prepare('SELECT * FROM stage WHERE tournament_id = ? ORDER BY id ASC').all(Number(req.params.id)));
+}));
+
+app.get('/api/tournament/:id/participants', wrap(async (req, res) => {
+  res.json(db.prepare('SELECT * FROM participant WHERE tournament_id = ? ORDER BY id ASC').all(Number(req.params.id)));
+}));
+
 app.post('/api/tournament', wrap(async (req, res) => {
   const { name } = req.body as { name: string };
   if (!name?.trim()) { res.status(400).json({ error: 'name is required' }); return; }
