@@ -166,23 +166,27 @@ app.patch('/api/match', wrap(async (req, res) => {
 
   const { id, opponent1, opponent2, status } = req.body;
 
-  // Try manager first — it handles advancement, best-of completion, and scores.
-  // Only fall back to direct writes when it fails due to a null/BYE opponent slot.
+  // Determine upfront whether this match has a BYE/TBD opponent.
+  // Only BYE matches use the direct-write fallback — real matches must let
+  // errors propagate so bracket advancement failures aren't silently swallowed.
+  const existingMatch = id !== undefined
+    ? await storage.selectFirst('match', { id }) as Record<string, unknown> | null
+    : null;
+  const matchHasBye = !!(existingMatch && (
+    existingMatch.opponent1 === null ||
+    existingMatch.opponent2 === null ||
+    (existingMatch.opponent1 as Record<string, unknown> | null)?.id === null ||
+    (existingMatch.opponent2 as Record<string, unknown> | null)?.id === null
+  ));
+
   let managerSucceeded = false;
   try {
     await manager.update.match(req.body);
     managerSucceeded = true;
   } catch (e) {
     const msg = (e as Error).message ?? String(e);
-    const isBYEError =
-      e instanceof TypeError ||
-      msg.toLowerCase().includes('null') ||
-      msg.toLowerCase().includes('undefined') ||
-      msg.toLowerCase().includes('bye');
-
-    if (!isBYEError) throw e; // real manager error — propagate to caller
-
-    console.warn('[route] manager.update.match failed (BYE/null opponent), falling back to direct writes:', msg);
+    if (!matchHasBye) throw e; // real match — propagate so the client sees the failure
+    console.warn('[route] BYE match update falling back to direct writes:', msg);
   }
 
   // Direct-write fallback: persist scores when manager couldn't run (null opponent / BYE slot).
