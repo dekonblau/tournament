@@ -11,12 +11,13 @@ import type { Stage } from 'brackets-model';
 export function TournamentPage() {
   const { tournamentId } = useParams<{ tournamentId: string }>();
   const id = Number(tournamentId);
-  const { tournaments, db, delete: del, refresh } = useManager();
+  const { tournaments, db, delete: del, deleteTournament, refresh } = useManager();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Stage | null>(null);
+  const [deleteTournamentOpen, setDeleteTournamentOpen] = useState(false);
 
   const tournament = tournaments.find((t) => t.id === id);
   const stages = db.stage.filter((s) => s.tournament_id === id);
@@ -55,6 +56,19 @@ export function TournamentPage() {
         onConfirm={handleDeleteStage}
         onCancel={() => setDeleteTarget(null)}
       />
+      <Confirm
+        open={deleteTournamentOpen}
+        title="Delete tournament?"
+        message={`Delete "${tournament?.name}"? All stages, matches, and results will be permanently removed.`}
+        danger
+        onConfirm={async () => {
+          setDeleteTournamentOpen(false);
+          await deleteTournament(id);
+          toast(`Tournament deleted`, 'info');
+          navigate('/');
+        }}
+        onCancel={() => setDeleteTournamentOpen(false)}
+      />
 
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '32px 24px' }}>
         {/* Header */}
@@ -70,9 +84,14 @@ export function TournamentPage() {
               Created {new Date(tournament.createdAt).toLocaleDateString()}
             </p>
           </div>
-          <Button variant="primary" icon={<Plus size={15} />} onClick={() => setCreateOpen(true)}>
-            Add Stage
-          </Button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Button variant="danger" icon={<Trash2 size={15} />} onClick={() => setDeleteTournamentOpen(true)}>
+              Delete Tournament
+            </Button>
+            <Button variant="primary" icon={<Plus size={15} />} onClick={() => setCreateOpen(true)}>
+              Add Stage
+            </Button>
+          </div>
         </div>
 
         {/* Participants summary */}

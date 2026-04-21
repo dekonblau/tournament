@@ -331,14 +331,35 @@ app.post('/api/stage/:stageId/reset-seeding', wrap(async (req, res) => {
 // DELETE (manager.delete)
 // ═════════════════════════════════════════════════════════════════════════════
 app.delete('/api/stage/:id', wrap(async (req, res) => {
-  await manager.delete.stage(Number(req.params.id));
+  const stageId = Number(req.params.id);
+  // Use a direct transaction instead of manager.delete.stage() which issues
+  // dozens of individual queries and can exceed nginx proxy timeouts.
+  db.transaction(() => {
+    db.prepare('DELETE FROM match_game WHERE stage_id = ?').run(stageId);
+    db.prepare('DELETE FROM match     WHERE stage_id = ?').run(stageId);
+    db.prepare('DELETE FROM round     WHERE stage_id = ?').run(stageId);
+    db.prepare('DELETE FROM "group"   WHERE stage_id = ?').run(stageId);
+    db.prepare('DELETE FROM stage     WHERE id = ?').run(stageId);
+  })();
+  exportCache = null;
   res.json({ ok: true });
 }));
 
 app.delete('/api/tournament/:id', wrap(async (req, res) => {
   const id = Number(req.params.id);
-  await manager.delete.tournament(id);
-  db.prepare('DELETE FROM tournament WHERE id = ?').run(id);
+  db.transaction(() => {
+    const stageIds = (db.prepare('SELECT id FROM stage WHERE tournament_id = ?').all(id) as { id: number }[]).map(r => r.id);
+    for (const sid of stageIds) {
+      db.prepare('DELETE FROM match_game WHERE stage_id = ?').run(sid);
+      db.prepare('DELETE FROM match     WHERE stage_id = ?').run(sid);
+      db.prepare('DELETE FROM round     WHERE stage_id = ?').run(sid);
+      db.prepare('DELETE FROM "group"   WHERE stage_id = ?').run(sid);
+      db.prepare('DELETE FROM stage     WHERE id = ?').run(sid);
+    }
+    db.prepare('DELETE FROM participant  WHERE tournament_id = ?').run(id);
+    db.prepare('DELETE FROM tournament   WHERE id = ?').run(id);
+  })();
+  exportCache = null;
   res.json({ ok: true });
 }));
 
