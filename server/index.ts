@@ -345,6 +345,13 @@ app.delete('/api/stage/:id', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+app.patch('/api/tournament/:id', wrap(async (req, res) => {
+  const { name } = req.body as { name: string };
+  if (!name?.trim()) { res.status(400).json({ error: 'name is required' }); return; }
+  db.prepare('UPDATE tournament SET name = ? WHERE id = ?').run(name.trim(), Number(req.params.id));
+  res.json({ ok: true });
+}));
+
 app.delete('/api/tournament/:id', wrap(async (req, res) => {
   const id = Number(req.params.id);
   db.transaction(() => {

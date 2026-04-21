@@ -228,6 +228,9 @@ export const deleteStage = (stageId: number) =>
 export const getTournaments = () =>
   get<TournamentRecord[]>('/api/tournaments');
 
+export const renameTournamentRecord = (id: number, name: string) =>
+  patch<{ ok: true }>(`/api/tournament/${id}`, { name });
+
 export const createTournamentRecord = (name: string) =>
   post<TournamentRecord>('/api/tournament', { name });
 

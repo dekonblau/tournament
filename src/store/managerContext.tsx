@@ -22,6 +22,7 @@ interface ManagerContextValue {
   refresh: () => Promise<void>;
   tournaments: Tournament[];
   createTournament: (name: string) => Promise<Tournament>;
+  renameTournament: (id: number, name: string) => Promise<void>;
   deleteTournament: (id: number) => Promise<void>;
   create: { stage: typeof api.createStage };
   update: {
@@ -96,6 +97,11 @@ export function ManagerProvider({ children }: { children: ReactNode }) {
     return t;
   }, []);
 
+  const renameTournament = useCallback(async (id: number, name: string) => {
+    await api.renameTournamentRecord(id, name);
+    setTournaments((prev) => prev.map((t) => t.id === id ? { ...t, name } : t));
+  }, []);
+
   const deleteTournament = useCallback(async (id: number) => {
     await api.deleteTournamentStages(id);
     setTournaments((prev) => prev.filter((t) => t.id !== id));
@@ -133,7 +139,7 @@ export function ManagerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value: ManagerContextValue = {
-    db, refresh, tournaments, createTournament, deleteTournament,
+    db, refresh, tournaments, createTournament, renameTournament, deleteTournament,
     create: { stage: api.createStage },
     update: {
       match: api.updateMatch,

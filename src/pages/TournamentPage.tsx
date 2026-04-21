@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Swords, Trophy, Users, ChevronRight, Trash2 } from 'lucide-react';
+import { Plus, Swords, Trophy, Users, ChevronRight, Trash2, Pencil, Check, X } from 'lucide-react';
 import { useManager } from '../store/managerContext';
 import { Card, Badge, Confirm, Divider } from '../components/ui/index';
 import { Button } from '../components/ui/Button';
@@ -11,13 +11,31 @@ import type { Stage } from 'brackets-model';
 export function TournamentPage() {
   const { tournamentId } = useParams<{ tournamentId: string }>();
   const id = Number(tournamentId);
-  const { tournaments, db, delete: del, deleteTournament, refresh } = useManager();
+  const { tournaments, db, delete: del, deleteTournament, renameTournament, refresh } = useManager();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Stage | null>(null);
   const [deleteTournamentOpen, setDeleteTournamentOpen] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState('');
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const startRename = () => {
+    setNameValue(tournament?.name ?? '');
+    setEditingName(true);
+    setTimeout(() => nameInputRef.current?.focus(), 0);
+  };
+
+  const commitRename = async () => {
+    const trimmed = nameValue.trim();
+    if (trimmed && trimmed !== tournament?.name) {
+      await renameTournament(id, trimmed);
+      toast(`Renamed to "${trimmed}"`, 'success');
+    }
+    setEditingName(false);
+  };
 
   const tournament = tournaments.find((t) => t.id === id);
   const stages = db.stage.filter((s) => s.tournament_id === id);
@@ -79,7 +97,32 @@ export function TournamentPage() {
               <ChevronRight size={12} />
               <span>{tournament.name}</span>
             </div>
-            <h1 style={{ marginBottom: '4px' }}>{tournament.name}</h1>
+            {editingName ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                <input
+                  ref={nameInputRef}
+                  value={nameValue}
+                  onChange={(e) => setNameValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setEditingName(false); }}
+                  style={{
+                    fontSize: '24px', fontWeight: 700, background: 'var(--bg-elevated)',
+                    border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)',
+                    color: 'var(--text-primary)', padding: '2px 8px', outline: 'none',
+                    fontFamily: 'var(--font-sans)', width: '320px',
+                  }}
+                />
+                <button onClick={commitRename} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--green)', display: 'flex' }}><Check size={18} /></button>
+                <button onClick={() => setEditingName(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <h1 style={{ margin: 0 }}>{tournament.name}</h1>
+                <button onClick={startRename} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '2px', opacity: 0.5, transition: 'opacity 0.15s' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.5')}
+                ><Pencil size={14} /></button>
+              </div>
+            )}
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
               Created {new Date(tournament.createdAt).toLocaleDateString()}
             </p>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trophy, Plus, Swords, Users, TrendingUp } from 'lucide-react';
 import { useManager } from '../store/managerContext';
@@ -10,9 +10,20 @@ export function Dashboard() {
   const { tournaments, db, createTournament } = useManager();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [showNameInput, setShowNameInput] = useState(false);
+  const [newName, setNewName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const openNameInput = () => {
+    setNewName('');
+    setShowNameInput(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
 
   const handleQuickCreate = async () => {
-    const name = `Tournament ${tournaments.length + 1}`;
+    const name = newName.trim() || `Tournament ${tournaments.length + 1}`;
+    setShowNameInput(false);
+    setNewName('');
     const t = await createTournament(name);
     navigate(`/tournament/${t.id}`);
     toast(`Created "${name}"`, 'success');
@@ -34,9 +45,29 @@ export function Dashboard() {
             <h1 style={{ marginBottom: '6px' }}>Dashboard</h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Manage your tournaments and brackets</p>
           </div>
-          <Button variant="primary" icon={<Plus size={15} />} size="lg" onClick={handleQuickCreate}>
-            New Tournament
-          </Button>
+          {showNameInput ? (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <input
+                ref={inputRef}
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleQuickCreate(); if (e.key === 'Escape') { setShowNameInput(false); setNewName(''); } }}
+                placeholder={`Tournament ${tournaments.length + 1}`}
+                style={{
+                  background: 'var(--bg-elevated)', border: '1px solid var(--accent)',
+                  borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
+                  padding: '10px 14px', fontSize: '14px', outline: 'none',
+                  fontFamily: 'var(--font-sans)', width: '220px',
+                }}
+              />
+              <Button variant="primary" size="lg" onClick={handleQuickCreate}>Create</Button>
+              <Button variant="ghost" size="lg" onClick={() => { setShowNameInput(false); setNewName(''); }}>Cancel</Button>
+            </div>
+          ) : (
+            <Button variant="primary" icon={<Plus size={15} />} size="lg" onClick={openNameInput}>
+              New Tournament
+            </Button>
+          )}
         </div>
       </div>
 
@@ -69,7 +100,7 @@ export function Dashboard() {
             <Card style={{ padding: '32px', textAlign: 'center' }}>
               <Trophy size={32} style={{ color: 'var(--text-muted)', margin: '0 auto 12px' }} />
               <p style={{ color: 'var(--text-muted)', marginBottom: '16px', fontSize: '13px' }}>No tournaments yet</p>
-              <Button variant="primary" icon={<Plus size={14} />} onClick={handleQuickCreate}>Create your first</Button>
+              <Button variant="primary" icon={<Plus size={14} />} onClick={openNameInput}>Create your first</Button>
             </Card>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
