@@ -67,6 +67,8 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
   const [bracketSize, setBracketSize] = useState(0);
   const [rrMode, setRrMode] = useState<'simple' | 'double'>('simple');
   const [groupCount, setGroupCount] = useState(1);
+  const [groupCountRaw, setGroupCountRaw] = useState('1');
+  const [matchesChildCountRaw, setMatchesChildCountRaw] = useState('0');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -230,8 +232,13 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
             <Input
               label="Number of groups"
               type="number"
-              value={groupCount}
-              onChange={(e) => setGroupCount(Math.max(1, parseInt(e.target.value) || 1))}
+              value={groupCountRaw}
+              onChange={(e) => setGroupCountRaw(e.target.value)}
+              onBlur={() => {
+                const n = Math.max(1, parseInt(groupCountRaw) || 1);
+                setGroupCount(n);
+                setGroupCountRaw(String(n));
+              }}
               hint="Split participants into multiple round-robin groups"
             />
           </>
@@ -241,8 +248,13 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
         <Input
           label="Best-of (match games per match, 0 = single match)"
           type="number"
-          value={matchesChildCount}
-          onChange={(e) => setMatchesChildCount(Math.max(0, parseInt(e.target.value) || 0))}
+          value={matchesChildCountRaw}
+          onChange={(e) => setMatchesChildCountRaw(e.target.value)}
+          onBlur={() => {
+            const n = Math.max(0, parseInt(matchesChildCountRaw) || 0);
+            setMatchesChildCount(n);
+            setMatchesChildCountRaw(String(n));
+          }}
           hint="Set to 3 for best-of-3, 5 for best-of-5, etc."
         />
 

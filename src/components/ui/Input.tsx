@@ -6,7 +6,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   hint?: string;
 }
 
-export function Input({ label, error, hint, style, ...props }: InputProps) {
+export function Input({ label, error, hint, style, onFocus, onBlur, ...props }: InputProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
       {label && (
@@ -28,8 +28,8 @@ export function Input({ label, error, hint, style, ...props }: InputProps) {
           transition: 'border-color 0.15s',
           ...style,
         }}
-        onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
-        onBlur={(e) => { e.currentTarget.style.borderColor = error ? 'var(--red)' : 'var(--border-strong)'; }}
+        onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; onFocus?.(e); }}
+        onBlur={(e) => { e.currentTarget.style.borderColor = error ? 'var(--red)' : 'var(--border-strong)'; onBlur?.(e); }}
         {...props}
       />
       {error && <span style={{ fontSize: '11px', color: 'var(--red)' }}>{error}</span>}
