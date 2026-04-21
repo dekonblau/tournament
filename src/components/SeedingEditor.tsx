@@ -97,44 +97,59 @@ export function SeedingEditor({ open, onClose, stage }: Props) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-            Drag rows to reorder seeding. Null slots represent BYEs.
+            Drag rows to reorder. Empty slots are <strong>TBD</strong> — they become BYEs when the tournament starts.
           </p>
-          {seeding.map((name, i) => (
-            <div
-              key={i}
-              draggable
-              onDragStart={() => handleDragStart(i)}
-              onDragOver={(e) => handleDragOver(e, i)}
-              onDrop={() => handleDrop(i)}
-              onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '8px 12px',
-                background: overIdx === i ? 'var(--accent-dim)' : dragIdx === i ? 'var(--bg-hover)' : 'var(--bg-overlay)',
-                border: `1px solid ${overIdx === i ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`,
-                borderRadius: 'var(--radius-sm)',
-                cursor: 'grab', transition: 'background 0.1s, border-color 0.1s',
-              }}
-            >
-              <GripVertical size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', minWidth: 20 }}>#{i + 1}</span>
-              <input
-                value={name ?? ''}
-                onChange={(e) => {
-                  const next = [...seeding];
-                  next[i] = e.target.value || null;
-                  setSeeding(next);
-                }}
-                placeholder="BYE"
+          {seeding.map((name, i) => {
+            const isTbd = !name;
+            const bgColor = overIdx === i
+              ? 'var(--accent-dim)'
+              : dragIdx === i
+              ? 'var(--bg-hover)'
+              : isTbd
+              ? 'rgba(245,158,11,0.06)'
+              : 'var(--bg-overlay)';
+            const borderColor = overIdx === i
+              ? 'rgba(99,102,241,0.3)'
+              : isTbd
+              ? 'rgba(245,158,11,0.25)'
+              : 'var(--border)';
+            return (
+              <div
+                key={i}
+                draggable
+                onDragStart={() => handleDragStart(i)}
+                onDragOver={(e) => handleDragOver(e, i)}
+                onDrop={() => handleDrop(i)}
+                onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
                 style={{
-                  flex: 1, background: 'transparent', border: 'none', outline: 'none',
-                  color: name ? 'var(--text-primary)' : 'var(--text-muted)',
-                  fontFamily: 'var(--font-sans)', fontSize: '13px',
-                  fontStyle: name ? 'normal' : 'italic',
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '8px 12px',
+                  background: bgColor,
+                  border: `1px solid ${borderColor}`,
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'grab', transition: 'background 0.1s, border-color 0.1s',
                 }}
-              />
-            </div>
-          ))}
+              >
+                <GripVertical size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', minWidth: 20 }}>#{i + 1}</span>
+                <input
+                  value={name ?? ''}
+                  onChange={(e) => {
+                    const next = [...seeding];
+                    next[i] = e.target.value || null;
+                    setSeeding(next);
+                  }}
+                  placeholder="TBD"
+                  style={{
+                    flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                    color: name ? 'var(--text-primary)' : 'rgba(245,158,11,0.7)',
+                    fontFamily: 'var(--font-sans)', fontSize: '13px',
+                    fontStyle: name ? 'normal' : 'italic',
+                  }}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </Modal>

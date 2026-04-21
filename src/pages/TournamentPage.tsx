@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Swords, Trophy, Users, ChevronRight, Trash2, Pencil, Check, X, PlayCircle } from 'lucide-react';
+import { Plus, Swords, Trophy, Users, ChevronRight, Trash2, Pencil, Check, X, PlayCircle, UserPlus } from 'lucide-react';
 import { useManager } from '../store/managerContext';
 import { Card, Badge, Confirm, Divider } from '../components/ui/index';
 import { Button } from '../components/ui/Button';
@@ -11,7 +11,7 @@ import type { Stage } from 'brackets-model';
 export function TournamentPage() {
   const { tournamentId } = useParams<{ tournamentId: string }>();
   const id = Number(tournamentId);
-  const { tournaments, db, delete: del, deleteTournament, renameTournament, startTournament, refresh } = useManager();
+  const { tournaments, db, delete: del, deleteTournament, renameTournament, startTournament, refresh, addParticipants, removeParticipant, renameParticipant } = useManager();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -22,6 +22,12 @@ export function TournamentPage() {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState('');
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const [addingParticipants, setAddingParticipants] = useState(false);
+  const [participantInput, setParticipantInput] = useState('');
+  const [addingLoading, setAddingLoading] = useState(false);
+  const [removeTargetId, setRemoveTargetId] = useState<number | null>(null);
+  const [editingParticipantId, setEditingParticipantId] = useState<number | null>(null);
+  const [editingParticipantName, setEditingParticipantName] = useState('');
 
   const startRename = () => {
     setNameValue(tournament?.name ?? '');
@@ -168,23 +174,160 @@ export function TournamentPage() {
           </div>
         </div>
 
-        {/* Participants summary */}
-        {db.participant.filter((p) => p.tournament_id === id).length > 0 && (
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '16px 20px', marginBottom: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <Users size={15} style={{ color: 'var(--text-muted)' }} />
-              <span style={{ fontSize: '13px', fontWeight: 500 }}>Participants</span>
-              <Badge variant="accent">{db.participant.filter((p) => p.tournament_id === id).length}</Badge>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {db.participant.filter((p) => p.tournament_id === id).map((p) => (
-                <span key={p.id} style={{ fontSize: '12px', padding: '3px 10px', background: 'var(--bg-overlay)', border: '1px solid var(--border)', borderRadius: '99px', color: 'var(--text-secondary)' }}>
-                  {p.name}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Participants management */}
+        {(() => {
+          const tournamentParticipants = db.participant.filter((p) => p.tournament_id === id);
+          const showSection = tournamentParticipants.length > 0 || !tournament.startedAt;
+          if (!showSection) return null;
+
+          const handleAddParticipants = async () => {
+            const names = participantInput.split('\n').map((n) => n.trim()).filter(Boolean);
+            if (!names.length) return;
+            setAddingLoading(true);
+            try {
+              await addParticipants(id, names);
+              setParticipantInput('');
+              setAddingParticipants(false);
+              toast(`Added ${names.length} participant${names.length > 1 ? 's' : ''}`, 'success');
+            } catch (e: unknown) {
+              toast(e instanceof Error ? e.message : 'Failed to add participants', 'error');
+            } finally {
+              setAddingLoading(false);
+            }
+          };
+
+          const handleRemoveParticipant = async (pid: number) => {
+            try {
+              await removeParticipant(pid);
+              toast('Participant removed', 'info');
+            } catch (e: unknown) {
+              toast(e instanceof Error ? e.message : 'Cannot remove participant', 'error');
+            } finally {
+              setRemoveTargetId(null);
+            }
+          };
+
+          const handleRenameParticipant = async () => {
+            if (!editingParticipantId) return;
+            const trimmed = editingParticipantName.trim();
+            if (!trimmed) return;
+            try {
+              await renameParticipant(editingParticipantId, trimmed);
+              toast('Participant renamed', 'success');
+            } catch (e: unknown) {
+              toast(e instanceof Error ? e.message : 'Failed to rename', 'error');
+            } finally {
+              setEditingParticipantId(null);
+            }
+          };
+
+          return (
+            <>
+              <Confirm
+                open={removeTargetId !== null}
+                title="Remove participant?"
+                message={`Remove "${tournamentParticipants.find((p) => p.id === removeTargetId)?.name}"? This cannot be undone.`}
+                danger
+                onConfirm={() => removeTargetId !== null && handleRemoveParticipant(removeTargetId)}
+                onCancel={() => setRemoveTargetId(null)}
+              />
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '16px 20px', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: tournamentParticipants.length > 0 || addingParticipants ? '12px' : '0' }}>
+                  <Users size={15} style={{ color: 'var(--text-muted)' }} />
+                  <span style={{ fontSize: '13px', fontWeight: 500 }}>Participants</span>
+                  {tournamentParticipants.length > 0 && <Badge variant="accent">{tournamentParticipants.length}</Badge>}
+                  <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
+                    {!tournament.startedAt && !addingParticipants && (
+                      <Button variant="ghost" size="sm" icon={<UserPlus size={13} />} onClick={() => setAddingParticipants(true)}>
+                        Add
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {tournamentParticipants.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: addingParticipants ? '12px' : '0' }}>
+                    {tournamentParticipants.map((p) => (
+                      editingParticipantId === p.id ? (
+                        <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <input
+                            autoFocus
+                            value={editingParticipantName}
+                            onChange={(e) => setEditingParticipantName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleRenameParticipant(); if (e.key === 'Escape') setEditingParticipantId(null); }}
+                            style={{
+                              fontSize: '12px', padding: '2px 8px',
+                              background: 'var(--bg-elevated)', border: '1px solid var(--accent)',
+                              borderRadius: '99px', color: 'var(--text-primary)',
+                              outline: 'none', fontFamily: 'var(--font-sans)', width: '120px',
+                            }}
+                          />
+                          <button onClick={handleRenameParticipant} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--green)', display: 'flex', padding: '2px' }}><Check size={13} /></button>
+                          <button onClick={() => setEditingParticipantId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '2px' }}><X size={13} /></button>
+                        </div>
+                      ) : (
+                        <span
+                          key={p.id}
+                          style={{
+                            fontSize: '12px', padding: '3px 8px 3px 10px',
+                            background: 'var(--bg-overlay)', border: '1px solid var(--border)',
+                            borderRadius: '99px', color: 'var(--text-secondary)',
+                            display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          }}
+                        >
+                          {p.name}
+                          {!tournament.startedAt && (
+                            <>
+                              <button
+                                onClick={() => { setEditingParticipantId(p.id as number); setEditingParticipantName(p.name); }}
+                                title="Rename"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '1px', opacity: 0.5, transition: 'opacity 0.15s' }}
+                                onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                                onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.5')}
+                              ><Pencil size={10} /></button>
+                              <button
+                                onClick={() => setRemoveTargetId(p.id as number)}
+                                title="Remove"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '1px', opacity: 0.5, transition: 'opacity 0.15s, color 0.15s' }}
+                                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--red)'; }}
+                                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.5'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
+                              ><X size={10} /></button>
+                            </>
+                          )}
+                        </span>
+                      )
+                    ))}
+                  </div>
+                )}
+
+                {addingParticipants && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <textarea
+                      autoFocus
+                      value={participantInput}
+                      onChange={(e) => setParticipantInput(e.target.value)}
+                      placeholder="One participant name per line"
+                      rows={4}
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)',
+                        padding: '8px 10px', fontSize: '13px',
+                        fontFamily: 'var(--font-sans)', outline: 'none', resize: 'vertical',
+                      }}
+                      onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--accent)')}
+                      onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
+                    />
+                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                      <Button variant="ghost" size="sm" onClick={() => { setAddingParticipants(false); setParticipantInput(''); }}>Cancel</Button>
+                      <Button variant="primary" size="sm" loading={addingLoading} onClick={handleAddParticipants}>Add Participants</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          );
+        })()}
 
         <Divider style={{ marginBottom: '24px' }} />
 

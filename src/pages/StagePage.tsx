@@ -125,9 +125,11 @@ export function StagePage() {
             </div>
 
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <Button variant="ghost" size="sm" icon={<Shuffle size={13} />} onClick={() => setSeedingOpen(true)}>
-                Edit Seeding
-              </Button>
+              {!tournament.startedAt && (
+                <Button variant="ghost" size="sm" icon={<Shuffle size={13} />} onClick={() => setSeedingOpen(true)}>
+                  Edit Seeding
+                </Button>
+              )}
               <Button variant="ghost" size="sm" icon={<RefreshCw size={13} />} onClick={() => { refresh(); toast('Refreshed', 'info'); }}>
                 Refresh
               </Button>

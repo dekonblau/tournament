@@ -85,6 +85,50 @@ app.post('/api/import', wrap(async (req, res) => {
 }));
 
 // ═════════════════════════════════════════════════════════════════════════════
+// PARTICIPANTS
+// ═════════════════════════════════════════════════════════════════════════════
+app.post('/api/participant', wrap(async (req, res) => {
+  const { tournamentId, names } = req.body as { tournamentId: number; names: string[] };
+  if (!tournamentId || !Array.isArray(names) || names.length === 0) {
+    res.status(400).json({ error: 'tournamentId and names[] are required' }); return;
+  }
+  const insert = db.prepare('INSERT INTO participant (tournament_id, name) VALUES (?, ?)');
+  const ids: number[] = [];
+  db.transaction(() => {
+    for (const name of names) {
+      const trimmed = name.trim();
+      if (!trimmed) continue;
+      const r = insert.run(tournamentId, trimmed);
+      ids.push(Number(r.lastInsertRowid));
+    }
+  })();
+  exportCache = null;
+  res.json({ ok: true, ids });
+}));
+
+app.patch('/api/participant/:id', wrap(async (req, res) => {
+  const { name } = req.body as { name: string };
+  if (!name?.trim()) { res.status(400).json({ error: 'name is required' }); return; }
+  db.prepare('UPDATE participant SET name = ? WHERE id = ?').run(name.trim(), Number(req.params.id));
+  exportCache = null;
+  res.json({ ok: true });
+}));
+
+app.delete('/api/participant/:id', wrap(async (req, res) => {
+  const pid = Number(req.params.id);
+  const used = db.prepare(
+    `SELECT COUNT(*) AS n FROM match
+     WHERE json_extract(opponent1, '$.id') = ? OR json_extract(opponent2, '$.id') = ?`
+  ).get(pid, pid) as { n: number };
+  if (used.n > 0) {
+    res.status(400).json({ error: 'Participant is assigned to one or more matches and cannot be removed.' }); return;
+  }
+  db.prepare('DELETE FROM participant WHERE id = ?').run(pid);
+  exportCache = null;
+  res.json({ ok: true });
+}));
+
+// ═════════════════════════════════════════════════════════════════════════════
 // CREATE
 // ═════════════════════════════════════════════════════════════════════════════
 app.post('/api/stage', wrap(async (req, res) => {

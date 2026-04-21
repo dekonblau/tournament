@@ -65,6 +65,9 @@ interface ManagerContextValue {
   exportData: () => Promise<DBSnapshot>;
   importData: (data: DBSnapshot, normalizeIds?: boolean) => Promise<void>;
   clearAll: () => Promise<void>;
+  addParticipants: (tournamentId: number, names: string[]) => Promise<void>;
+  renameParticipant: (id: number, name: string) => Promise<void>;
+  removeParticipant: (id: number) => Promise<void>;
   getParticipantName: (id: number | null | undefined) => string;
   getStageMatches: (stageId: number) => Match[];
   getStageRounds: (stageId: number) => Round[];
@@ -128,6 +131,21 @@ export function ManagerProvider({ children }: { children: ReactNode }) {
     await refresh();
   }, [refresh]);
 
+  const addParticipants = useCallback(async (tournamentId: number, names: string[]) => {
+    await api.addParticipants(tournamentId, names);
+    await refresh();
+  }, [refresh]);
+
+  const renameParticipant = useCallback(async (id: number, name: string) => {
+    await api.renameParticipant(id, name);
+    await refresh();
+  }, [refresh]);
+
+  const removeParticipant = useCallback(async (id: number) => {
+    await api.removeParticipant(id);
+    await refresh();
+  }, [refresh]);
+
   const getParticipantName = useCallback((id: number | null | undefined) => {
     if (id === null || id === undefined) return 'BYE';
     return db.participant.find((p) => p.id === id)?.name ?? `#${id}`;
@@ -184,7 +202,7 @@ export function ManagerProvider({ children }: { children: ReactNode }) {
       stage: api.deleteStage,
       tournament: api.deleteTournamentStages,
     },
-    exportData, importData, clearAll,
+    exportData, importData, clearAll, addParticipants, renameParticipant, removeParticipant,
     getParticipantName, getStageMatches, getStageRounds, getStageParticipants,
     getFinalStandings, getRoundRobinStandings,
   };

@@ -243,3 +243,13 @@ export const deleteTournamentStages = (tournamentId: number) =>
 
 export const resetAllData = () =>
   del<{ ok: true }>('/api/reset');
+
+// ─── Participants ─────────────────────────────────────────────────────────────
+export const addParticipants = (tournamentId: number, names: string[]) =>
+  post<{ ok: true; ids: number[] }>('/api/participant', { tournamentId, names });
+
+export const renameParticipant = (id: number, name: string) =>
+  patch<{ ok: true }>(`/api/participant/${id}`, { name });
+
+export const removeParticipant = (id: number) =>
+  del<{ ok: true }>(`/api/participant/${id}`);
