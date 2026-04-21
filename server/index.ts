@@ -49,8 +49,22 @@ app.get('/api/tournament/:id/stages', wrap(async (req, res) => {
   res.json(db.prepare('SELECT * FROM stage WHERE tournament_id = ? ORDER BY id ASC').all(Number(req.params.id)));
 }));
 
-app.get('/api/tournament/:id/participants', wrap(async (req, res) => {
-  res.json(db.prepare('SELECT * FROM participant WHERE tournament_id = ? ORDER BY id ASC').all(Number(req.params.id)));
+// Returns participants seeded into a specific stage, in slot order.
+// (Replaces the tournament-scoped /participants endpoint which was too broad —
+//  a tournament can have multiple stages with different participant sets.)
+// Slots with no participant (TBD) are included with name: null so the caller
+// can see the full seeding layout and identify open positions by slot_index.
+app.get('/api/stage/:id/participants', wrap(async (req, res) => {
+  const stageId = Number(req.params.id);
+  const slots = await manager.get.seeding(stageId);
+  const result = slots.map((slot, index) => {
+    if (!slot || (slot as { id: number | null }).id === null) {
+      return { slot_index: index, id: null, name: null };
+    }
+    const p = db.prepare('SELECT * FROM participant WHERE id = ?').get((slot as { id: number }).id) as { id: number; name: string } | undefined;
+    return { slot_index: index, id: p?.id ?? null, name: p?.name ?? null };
+  });
+  res.json(result);
 }));
 
 app.post('/api/tournament', wrap(async (req, res) => {
