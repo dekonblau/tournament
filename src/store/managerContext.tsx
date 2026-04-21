@@ -14,7 +14,8 @@ export type { DBSnapshot };
 export interface Tournament {
   id: number;
   name: string;
-  createdAt: string; // mapped from created_at
+  createdAt: string;
+  startedAt: string | null;
 }
 
 interface ManagerContextValue {
@@ -23,6 +24,7 @@ interface ManagerContextValue {
   tournaments: Tournament[];
   createTournament: (name: string) => Promise<Tournament>;
   renameTournament: (id: number, name: string) => Promise<void>;
+  startTournament: (id: number) => Promise<void>;
   deleteTournament: (id: number) => Promise<void>;
   create: { stage: typeof api.createStage };
   update: {
@@ -81,7 +83,7 @@ export function ManagerProvider({ children }: { children: ReactNode }) {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
 
   const toTournament = (r: TournamentRecord): Tournament => ({
-    id: r.id, name: r.name, createdAt: r.created_at,
+    id: r.id, name: r.name, createdAt: r.created_at, startedAt: r.started_at ?? null,
   });
 
   const refresh = useCallback(async () => {
@@ -101,6 +103,12 @@ export function ManagerProvider({ children }: { children: ReactNode }) {
     await api.renameTournamentRecord(id, name);
     setTournaments((prev) => prev.map((t) => t.id === id ? { ...t, name } : t));
   }, []);
+
+  const startTournament = useCallback(async (id: number) => {
+    await api.startTournamentApi(id);
+    setTournaments((prev) => prev.map((t) => t.id === id ? { ...t, startedAt: new Date().toISOString() } : t));
+    await refresh();
+  }, [refresh]);
 
   const deleteTournament = useCallback(async (id: number) => {
     await api.deleteTournamentStages(id);
@@ -139,7 +147,7 @@ export function ManagerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value: ManagerContextValue = {
-    db, refresh, tournaments, createTournament, renameTournament, deleteTournament,
+    db, refresh, tournaments, createTournament, renameTournament, startTournament, deleteTournament,
     create: { stage: api.createStage },
     update: {
       match: api.updateMatch,

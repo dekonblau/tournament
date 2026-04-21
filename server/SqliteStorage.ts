@@ -12,7 +12,8 @@ const SCHEMA = `
   CREATE TABLE IF NOT EXISTS tournament (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     name       TEXT    NOT NULL,
-    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    started_at TEXT    DEFAULT NULL
   );
 
   CREATE TABLE IF NOT EXISTS participant (
@@ -83,6 +84,8 @@ export class SqliteStorage implements CrudInterface {
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
     this.db.exec(SCHEMA);
+    // Migration: add started_at if upgrading from older schema
+    try { this.db.exec("ALTER TABLE tournament ADD COLUMN started_at TEXT DEFAULT NULL"); } catch { /* already exists */ }
 
     // Bind all methods so 'this' is never lost when brackets-manager calls them
     this.insert     = this.insert.bind(this);

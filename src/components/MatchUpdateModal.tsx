@@ -96,9 +96,15 @@ export function MatchUpdateModal({ matchId, onClose }: Props) {
 
   if (!match || matchId === null) return null;
 
-  const p1Name = getParticipantName(match.opponent1?.id);
-  const p2Name = getParticipantName(match.opponent2?.id);
-  const isBye = match.opponent1?.id === null || match.opponent2?.id === null;
+  const oppLabel = (opp: typeof match.opponent1) => {
+    if (opp == null) return 'BYE';
+    if (opp.id == null) return 'TBD';
+    return getParticipantName(opp.id as number);
+  };
+  const p1Name = oppLabel(match.opponent1);
+  const p2Name = oppLabel(match.opponent2);
+  const isBye = match.opponent1 == null || match.opponent2 == null ||
+    match.opponent1.id == null || match.opponent2.id == null;
   const canEdit = (match.status ?? 0) >= 2;
 
   const winner = score1 > score2 ? 'p1' : score2 > score1 ? 'p2' : forfeit1 ? 'p2' : forfeit2 ? 'p1' : null;

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Swords, Trophy, Users, ChevronRight, Trash2, Pencil, Check, X } from 'lucide-react';
+import { Plus, Swords, Trophy, Users, ChevronRight, Trash2, Pencil, Check, X, PlayCircle } from 'lucide-react';
 import { useManager } from '../store/managerContext';
 import { Card, Badge, Confirm, Divider } from '../components/ui/index';
 import { Button } from '../components/ui/Button';
@@ -11,13 +11,14 @@ import type { Stage } from 'brackets-model';
 export function TournamentPage() {
   const { tournamentId } = useParams<{ tournamentId: string }>();
   const id = Number(tournamentId);
-  const { tournaments, db, delete: del, deleteTournament, renameTournament, refresh } = useManager();
+  const { tournaments, db, delete: del, deleteTournament, renameTournament, startTournament, refresh } = useManager();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Stage | null>(null);
   const [deleteTournamentOpen, setDeleteTournamentOpen] = useState(false);
+  const [startConfirmOpen, setStartConfirmOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState('');
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -75,6 +76,18 @@ export function TournamentPage() {
         onCancel={() => setDeleteTarget(null)}
       />
       <Confirm
+        open={startConfirmOpen}
+        title="Start tournament?"
+        message="TBD slots will become BYEs and bracket progression will begin. This cannot be undone."
+        danger={false}
+        onConfirm={async () => {
+          setStartConfirmOpen(false);
+          await startTournament(id);
+          toast('Tournament started', 'success');
+        }}
+        onCancel={() => setStartConfirmOpen(false)}
+      />
+      <Confirm
         open={deleteTournamentOpen}
         title="Delete tournament?"
         message={`Delete "${tournament?.name}"? All stages, matches, and results will be permanently removed.`}
@@ -123,17 +136,35 @@ export function TournamentPage() {
                 ><Pencil size={14} /></button>
               </div>
             )}
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-              Created {new Date(tournament.createdAt).toLocaleDateString()}
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>
+                Created {new Date(tournament.createdAt).toLocaleDateString()}
+              </p>
+              {tournament.startedAt ? (
+                <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                  Started {new Date(tournament.startedAt).toLocaleDateString()}
+                </span>
+              ) : (
+                <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: 'var(--bg-overlay)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                  Registration open
+                </span>
+              )}
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
+            {!tournament.startedAt && stages.length > 0 && (
+              <Button variant="success" icon={<PlayCircle size={15} />} onClick={() => setStartConfirmOpen(true)}>
+                Start Tournament
+              </Button>
+            )}
             <Button variant="danger" icon={<Trash2 size={15} />} onClick={() => setDeleteTournamentOpen(true)}>
-              Delete Tournament
+              Delete
             </Button>
-            <Button variant="primary" icon={<Plus size={15} />} onClick={() => setCreateOpen(true)}>
-              Add Stage
-            </Button>
+            {!tournament.startedAt && (
+              <Button variant="primary" icon={<Plus size={15} />} onClick={() => setCreateOpen(true)}>
+                Add Stage
+              </Button>
+            )}
           </div>
         </div>
 

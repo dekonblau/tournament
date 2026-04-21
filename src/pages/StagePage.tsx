@@ -200,8 +200,14 @@ export function StagePage() {
                     stageMatches.map((m) => {
                       const round = roundMap[m.round_id];
                       const isCurrent = currentMatches.includes(m.id);
-                      const p1 = getParticipantName(m.opponent1?.id);
-                      const p2 = getParticipantName(m.opponent2?.id);
+                      // null opponent = BYE (slot closed); {id:null} = TBD (slot open)
+                      const oppLabel = (opp: typeof m.opponent1) => {
+                        if (opp == null) return 'BYE';
+                        if (opp.id == null) return 'TBD';
+                        return getParticipantName(opp.id as number);
+                      };
+                      const p1 = oppLabel(m.opponent1);
+                      const p2 = oppLabel(m.opponent2);
                       const s1 = m.opponent1?.score;
                       const s2 = m.opponent2?.score;
                       const isReady = (m.status ?? 0) >= 2 && (m.status ?? 0) < 5;

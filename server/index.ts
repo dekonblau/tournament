@@ -345,6 +345,21 @@ app.delete('/api/stage/:id', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+app.post('/api/tournament/:id/start', wrap(async (req, res) => {
+  const id = Number(req.params.id);
+  const stages = db.prepare('SELECT id FROM stage WHERE tournament_id = ?').all(id) as { id: number }[];
+  for (const { id: stageId } of stages) {
+    try {
+      await manager.update.confirmSeeding(stageId);
+    } catch {
+      // Stage already confirmed or no seeding to confirm — skip
+    }
+  }
+  db.prepare("UPDATE tournament SET started_at = datetime('now') WHERE id = ?").run(id);
+  exportCache = null;
+  res.json({ ok: true });
+}));
+
 app.patch('/api/tournament/:id', wrap(async (req, res) => {
   const { name } = req.body as { name: string };
   if (!name?.trim()) { res.status(400).json({ error: 'name is required' }); return; }

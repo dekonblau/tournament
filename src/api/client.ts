@@ -54,6 +54,7 @@ export interface TournamentRecord {
   id: number;
   name: string;
   created_at: string;
+  started_at: string | null;
 }
 
 export interface DBSnapshot {
@@ -230,6 +231,9 @@ export const getTournaments = () =>
 
 export const renameTournamentRecord = (id: number, name: string) =>
   patch<{ ok: true }>(`/api/tournament/${id}`, { name });
+
+export const startTournamentApi = (id: number) =>
+  post<{ ok: true }>(`/api/tournament/${id}/start`);
 
 export const createTournamentRecord = (name: string) =>
   post<TournamentRecord>('/api/tournament', { name });

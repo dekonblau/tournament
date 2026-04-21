@@ -4,6 +4,7 @@ import { Button } from './ui/Button';
 import { Input, Select, Textarea } from './ui/Input';
 import { useManager } from '../store/managerContext';
 import { useToast } from './ui/index';
+import { updateSeeding } from '../api/client';
 import type { StageType } from '../types';
 
 interface Props {
@@ -75,8 +76,9 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
   // Auto-reset bracketSize if it's now smaller than the participant count
   const effectiveBracketSize = bracketSize > 0 && bracketSize < participants.length ? 0 : bracketSize;
 
-  // For elimination: pad to chosen size (always a power of 2)
-  let seeding: (string | null)[] = participants;
+  // For elimination: compute bracket size; do NOT pad seeding with nulls.
+  // Explicit nulls = BYE (auto-advance). TBD slots come from settings.size
+  // being larger than the seeding array — the library leaves those open.
   let totalSlots = participants.length;
   let tbdCount = 0;
   if (isElim && participants.length >= 2) {
@@ -84,7 +86,6 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
     const requestedSize = effectiveBracketSize > 0 ? effectiveBracketSize : autoSize;
     totalSlots = nextPow2(Math.max(requestedSize, participants.length));
     tbdCount = totalSlots - participants.length;
-    seeding = [...participants, ...Array(tbdCount).fill(null)];
   }
 
   const handleSubmit = async () => {
@@ -100,19 +101,30 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
         settings.consolationFinal = consolationFinal;
         settings.seedOrdering = [seedOrdering];
         settings.balanceByes = balanceByes;
+        if (tbdCount > 0) settings.size = totalSlots;
       } else {
         settings.roundRobinMode = rrMode;
         settings.groupCount = groupCount;
       }
       if (matchesChildCount > 0) settings.matchesChildCount = matchesChildCount;
 
-      await create.stage({
+      // Create stage with size but no seeding — this leaves all slots as TBD
+      // (no BYEs pre-assigned). Then call update.seeding to assign the known
+      // participants; BYEs are only processed when the tournament is started
+      // (via confirmSeeding).
+      const stage = await create.stage({
         name: name.trim(),
         tournamentId,
         type,
-        seeding,
         settings,
       });
+      if (participants.length > 0) {
+        const fullSeeding: (string | null)[] = [
+          ...participants,
+          ...Array(tbdCount).fill(null),
+        ];
+        await updateSeeding(stage.id as number, fullSeeding);
+      }
 
       await refresh();
       toast(`Stage "${name.trim()}" created`, 'success');
@@ -169,7 +181,7 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
         )}
 
         <Textarea
-          label="Participants (one per line, leave blank lines or omit for TBD)"
+          label="Participants (one per line)"
           value={participantsRaw}
           onChange={(e) => setParticipantsRaw(e.target.value)}
           hint={
