@@ -11,9 +11,9 @@ export function Dashboard() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const handleQuickCreate = () => {
+  const handleQuickCreate = async () => {
     const name = `Tournament ${tournaments.length + 1}`;
-    const t = createTournament(name);
+    const t = await createTournament(name);
     navigate(`/tournament/${t.id}`);
     toast(`Created "${name}"`, 'success');
   };

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Trophy, LayoutDashboard, Users, Swords, BarChart2,
-  Settings, ChevronRight, Plus, Trash2, Download, Upload,
+  Settings, ChevronRight, Plus, Trash2, Download, Upload, RotateCcw,
 } from 'lucide-react';
 import { useManager } from '../../store/managerContext';
 import { useToast, Confirm, SectionLabel } from '../ui/index';
@@ -14,7 +14,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
-  const { tournaments, db, createTournament, deleteTournament, exportData, importData, refresh } = useManager();
+  const { tournaments, db, createTournament, deleteTournament, exportData, importData, clearAll, refresh } = useManager();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -22,14 +22,15 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const [newTournamentName, setNewTournamentName] = useState('');
   const [showInput, setShowInput] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
   const activeTournamentId = location.pathname.match(/\/tournament\/(\d+)/)?.[1];
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const name = newTournamentName.trim();
     if (!name) return;
-    const t = createTournament(name);
+    const t = await createTournament(name);
     setNewTournamentName('');
     setShowInput(false);
     navigate(`/tournament/${t.id}`);
@@ -86,6 +87,19 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
           }
         }}
         onCancel={() => setDeleteTarget(null)}
+      />
+      <Confirm
+        open={showClearConfirm}
+        title="Clear all data?"
+        message="This will delete all tournaments, stages, and matches. Participants will be kept. This cannot be undone."
+        danger
+        onConfirm={async () => {
+          await clearAll();
+          toast('All data cleared', 'info');
+          navigate('/');
+          setShowClearConfirm(false);
+        }}
+        onCancel={() => setShowClearConfirm(false)}
       />
 
       <aside
@@ -232,11 +246,13 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
             <>
               <IconBtn icon={<Download size={15} />} onClick={handleExport} title="Export data" />
               <IconBtn icon={<Upload size={15} />} onClick={handleImport} title="Import data" />
+              <IconBtn icon={<RotateCcw size={15} />} onClick={() => setShowClearConfirm(true)} title="Clear all data" />
             </>
           ) : (
             <div style={{ display: 'flex', gap: '4px' }}>
               <Button variant="ghost" size="sm" icon={<Download size={13} />} onClick={handleExport} style={{ flex: 1, justifyContent: 'center' }}>Export</Button>
               <Button variant="ghost" size="sm" icon={<Upload size={13} />} onClick={handleImport} style={{ flex: 1, justifyContent: 'center' }}>Import</Button>
+              <Button variant="ghost" size="sm" icon={<RotateCcw size={13} />} onClick={() => setShowClearConfirm(true)} title="Clear all data" style={{ color: 'var(--red)', flexShrink: 0 }} />
             </div>
           )}
         </div>

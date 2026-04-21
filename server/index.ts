@@ -37,6 +37,23 @@ function wrap(fn: (req: Request, res: Response) => Promise<unknown>) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// TOURNAMENTS (server-persisted, not localStorage)
+// ═════════════════════════════════════════════════════════════════════════════
+const db = (storage as unknown as { db: import('better-sqlite3').Database }).db;
+
+app.get('/api/tournaments', wrap(async (_req, res) => {
+  res.json(db.prepare('SELECT * FROM tournament ORDER BY id ASC').all());
+}));
+
+app.post('/api/tournament', wrap(async (req, res) => {
+  const { name } = req.body as { name: string };
+  if (!name?.trim()) { res.status(400).json({ error: 'name is required' }); return; }
+  const result = db.prepare("INSERT INTO tournament (name) VALUES (?)").run(name.trim());
+  const row = db.prepare('SELECT * FROM tournament WHERE id = ?').get(result.lastInsertRowid);
+  res.json(row);
+}));
+
+// ═════════════════════════════════════════════════════════════════════════════
 // GET  /api/export          — full database export (used to seed the viewer)
 // ═════════════════════════════════════════════════════════════════════════════
 app.get('/api/export', wrap(async (_req, res) => {
@@ -44,7 +61,8 @@ app.get('/api/export', wrap(async (_req, res) => {
   if (exportCache && now - exportCache.ts < EXPORT_TTL_MS) {
     return res.json(exportCache.data);
   }
-  const data = await manager.export();
+  const data = await manager.export() as Record<string, unknown>;
+  data.tournament = db.prepare('SELECT * FROM tournament ORDER BY id ASC').all();
   exportCache = { data, ts: now };
   res.json(data);
 }));
@@ -53,8 +71,16 @@ app.get('/api/export', wrap(async (_req, res) => {
 // POST /api/import          — import a full database snapshot
 // ═════════════════════════════════════════════════════════════════════════════
 app.post('/api/import', wrap(async (req, res) => {
-  const { data, normalizeIds = false } = req.body;
-  await manager.import(data, normalizeIds);
+  const { data, normalizeIds = false } = req.body as { data: Record<string, unknown>; normalizeIds?: boolean };
+  await manager.import(data as never, normalizeIds);
+  // Restore tournaments if included in the export payload
+  if (Array.isArray(data.tournament) && data.tournament.length > 0) {
+    db.prepare('DELETE FROM tournament').run();
+    const insert = db.prepare('INSERT INTO tournament (id, name, created_at) VALUES (?, ?, ?)');
+    for (const t of data.tournament as Array<{ id: number; name: string; created_at: string }>) {
+      insert.run(t.id, t.name, t.created_at);
+    }
+  }
   res.json({ ok: true });
 }));
 
@@ -243,7 +269,8 @@ app.get('/api/stage/:stageId/current-matches', wrap(async (req, res) => {
     res.json(await manager.get.currentMatches(Number(req.params.stageId)));
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes('Not implemented')) {
+    const isGraceful = msg.includes('Not implemented') || msg.toLowerCase().includes('not found');
+    if (isGraceful) {
       res.json([]);
     } else {
       throw e;
@@ -309,7 +336,26 @@ app.delete('/api/stage/:id', wrap(async (req, res) => {
 }));
 
 app.delete('/api/tournament/:id', wrap(async (req, res) => {
-  await manager.delete.tournament(Number(req.params.id));
+  const id = Number(req.params.id);
+  await manager.delete.tournament(id);
+  db.prepare('DELETE FROM tournament WHERE id = ?').run(id);
+  res.json({ ok: true });
+}));
+
+// ═════════════════════════════════════════════════════════════════════════════
+// DELETE /api/reset   — wipe all bracket data, keep participants
+// ═════════════════════════════════════════════════════════════════════════════
+app.delete('/api/reset', wrap(async (_req, res) => {
+  db.transaction(() => {
+    db.prepare('DELETE FROM match_game').run();
+    db.prepare('DELETE FROM match').run();
+    db.prepare('DELETE FROM round').run();
+    db.prepare('DELETE FROM "group"').run();
+    db.prepare('DELETE FROM stage').run();
+    db.prepare('DELETE FROM tournament').run();
+    db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('match_game','match','round','group','stage','tournament')").run();
+  })();
+  exportCache = null;
   res.json({ ok: true });
 }));
 

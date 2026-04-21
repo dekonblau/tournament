@@ -50,6 +50,12 @@ import type {
   Stage, Match, Participant, Round, Group, MatchGame,
 } from 'brackets-model';
 
+export interface TournamentRecord {
+  id: number;
+  name: string;
+  created_at: string;
+}
+
 export interface DBSnapshot {
   stage: Stage[];
   match: Match[];
@@ -57,6 +63,7 @@ export interface DBSnapshot {
   participant: Participant[];
   round: Round[];
   group: Group[];
+  tournament?: TournamentRecord[];
 }
 
 export interface FinalStandingsItem {
@@ -218,5 +225,14 @@ export const resetSeeding = (stageId: number) =>
 export const deleteStage = (stageId: number) =>
   del<{ ok: true }>(`/api/stage/${stageId}`);
 
+export const getTournaments = () =>
+  get<TournamentRecord[]>('/api/tournaments');
+
+export const createTournamentRecord = (name: string) =>
+  post<TournamentRecord>('/api/tournament', { name });
+
 export const deleteTournamentStages = (tournamentId: number) =>
   del<{ ok: true }>(`/api/tournament/${tournamentId}`);
+
+export const resetAllData = () =>
+  del<{ ok: true }>('/api/reset');

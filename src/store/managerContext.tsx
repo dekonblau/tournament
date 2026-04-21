@@ -6,7 +6,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import * as api from '../api/client';
-import type { DBSnapshot, FinalStandingsItem, RoundRobinStandingsItem } from '../api/client';
+import type { DBSnapshot, FinalStandingsItem, RoundRobinStandingsItem, TournamentRecord } from '../api/client';
 import type { Stage, Participant, Match, Round } from 'brackets-model';
 
 export type { DBSnapshot };
@@ -14,14 +14,14 @@ export type { DBSnapshot };
 export interface Tournament {
   id: number;
   name: string;
-  createdAt: string;
+  createdAt: string; // mapped from created_at
 }
 
 interface ManagerContextValue {
   db: DBSnapshot;
   refresh: () => Promise<void>;
   tournaments: Tournament[];
-  createTournament: (name: string) => Tournament;
+  createTournament: (name: string) => Promise<Tournament>;
   deleteTournament: (id: number) => Promise<void>;
   create: { stage: typeof api.createStage };
   update: {
@@ -61,6 +61,7 @@ interface ManagerContextValue {
   };
   exportData: () => Promise<DBSnapshot>;
   importData: (data: DBSnapshot, normalizeIds?: boolean) => Promise<void>;
+  clearAll: () => Promise<void>;
   getParticipantName: (id: number | null | undefined) => string;
   getStageMatches: (stageId: number) => Match[];
   getStageRounds: (stageId: number) => Round[];
@@ -76,39 +77,40 @@ export function ManagerProvider({ children }: { children: ReactNode }) {
     stage: [], match: [], match_game: [], participant: [], round: [], group: [],
   });
 
-  const [tournaments, setTournaments] = useState<Tournament[]>(() => {
-    try { return JSON.parse(localStorage.getItem('bm_tournaments') || '[]'); }
-    catch { return []; }
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+
+  const toTournament = (r: TournamentRecord): Tournament => ({
+    id: r.id, name: r.name, createdAt: r.created_at,
   });
 
   const refresh = useCallback(async () => {
-    const data = await api.exportData();
+    const [data, tList] = await Promise.all([api.exportData(), api.getTournaments()]);
     setDb(data);
+    setTournaments(tList.map(toTournament));
   }, []);
 
-  const createTournament = useCallback((name: string): Tournament => {
-    const t: Tournament = { id: Date.now(), name, createdAt: new Date().toISOString() };
-    setTournaments((prev) => {
-      const next = [...prev, t];
-      localStorage.setItem('bm_tournaments', JSON.stringify(next));
-      return next;
-    });
+  const createTournament = useCallback(async (name: string): Promise<Tournament> => {
+    const rec = await api.createTournamentRecord(name);
+    const t = toTournament(rec);
+    setTournaments((prev) => [...prev, t]);
     return t;
   }, []);
 
   const deleteTournament = useCallback(async (id: number) => {
     await api.deleteTournamentStages(id);
-    setTournaments((prev) => {
-      const next = prev.filter((t) => t.id !== id);
-      localStorage.setItem('bm_tournaments', JSON.stringify(next));
-      return next;
-    });
+    setTournaments((prev) => prev.filter((t) => t.id !== id));
     await refresh();
   }, [refresh]);
 
   const exportData = useCallback(() => api.exportData(), []);
   const importData = useCallback(async (data: DBSnapshot, normalizeIds = false) => {
     await api.importData(data, normalizeIds);
+    await refresh();
+  }, [refresh]);
+
+  const clearAll = useCallback(async () => {
+    await api.resetAllData();
+    setTournaments([]);
     await refresh();
   }, [refresh]);
 
@@ -168,7 +170,7 @@ export function ManagerProvider({ children }: { children: ReactNode }) {
       stage: api.deleteStage,
       tournament: api.deleteTournamentStages,
     },
-    exportData, importData,
+    exportData, importData, clearAll,
     getParticipantName, getStageMatches, getStageRounds, getStageParticipants,
     getFinalStandings, getRoundRobinStandings,
   };

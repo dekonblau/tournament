@@ -9,6 +9,12 @@ const JSON_COLUMNS: Partial<Record<Table, string[]>> = {
 };
 
 const SCHEMA = `
+  CREATE TABLE IF NOT EXISTS tournament (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT    NOT NULL,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS participant (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     tournament_id INTEGER NOT NULL,
