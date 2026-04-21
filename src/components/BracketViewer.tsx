@@ -18,7 +18,7 @@ declare global {
         matches: Match[];
         matchGames: MatchGame[];
         participants: Participant[];
-      }, options?: { selector?: string; clear?: boolean; participantOriginPlacement?: string }) => void;
+      }, options?: { selector?: string; clear?: boolean; participantOriginPlacement?: string }) => Promise<void>;
     };
   }
 }
@@ -72,10 +72,7 @@ export function BracketViewer({ stages, matches, matchGames, participants, onMat
       window.bracketsViewer.render(
         { stages, matches, matchGames, participants },
         { selector: `#${idRef.current}`, clear: true }
-      );
-
-      // Attach click handlers and inject match labels
-      setTimeout(() => {
+      ).then(() => {
         if (!containerRef.current) return;
 
         // Build label map: matchId → "WB 1.1" / "LB 2.3" / "GF 1.1"
@@ -107,6 +104,8 @@ export function BracketViewer({ stages, matches, matchGames, participants, onMat
           const matchId = parseInt((el as HTMLElement).dataset.matchId ?? '');
           if (isNaN(matchId)) return;
 
+          const matchData = matches.find((m) => (m.id as number) === matchId);
+
           if (onMatchClick) {
             (el as HTMLElement).style.cursor = 'pointer';
             (el as HTMLElement).onclick = () => onMatchClick(matchId);
@@ -114,6 +113,17 @@ export function BracketViewer({ stages, matches, matchGames, participants, onMat
 
           const opponents = el.querySelector('.opponents') as HTMLElement | null;
           if (!opponents) return;
+
+          if (matchData) {
+            const bothBye = matchData.opponent1 === null && matchData.opponent2 === null;
+            const status = bothBye ? 4 : (matchData.status ?? 0);
+            const statusColor: Record<number, string> = {
+              2: 'rgba(251,191,36,0.6)',
+              3: 'rgba(99,102,241,0.7)',
+              4: 'rgba(52,211,153,0.5)',
+            };
+            opponents.style.borderColor = statusColor[status] ?? '';
+          }
 
           // Re-use existing injected label or replace the native library span
           let label = opponents.querySelector('.bm-label') as HTMLElement | null;
@@ -160,7 +170,7 @@ export function BracketViewer({ stages, matches, matchGames, participants, onMat
             nameEl.style.opacity = '0.65';
           });
         });
-      }, 50);
+      });
     }).catch(() => {
       console.error('Failed to load brackets-viewer from CDN');
     });

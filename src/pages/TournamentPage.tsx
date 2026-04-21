@@ -166,11 +166,9 @@ export function TournamentPage() {
             <Button variant="danger" icon={<Trash2 size={15} />} onClick={() => setDeleteTournamentOpen(true)}>
               Delete
             </Button>
-            {!tournament.startedAt && (
-              <Button variant="primary" icon={<Plus size={15} />} onClick={() => setCreateOpen(true)}>
-                Add Stage
-              </Button>
-            )}
+            <Button variant="primary" icon={<Plus size={15} />} onClick={() => setCreateOpen(true)}>
+              Add Stage
+            </Button>
           </div>
         </div>
 
@@ -332,10 +330,17 @@ export function TournamentPage() {
         <Divider style={{ marginBottom: '24px' }} />
 
         {/* Stages */}
-        <h2 style={{ marginBottom: '16px' }}>
-          Stages
-          {stages.length > 0 && <Badge variant="muted" style={{ marginLeft: '10px' } as React.CSSProperties}>{stages.length}</Badge>}
-        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+          <h2 style={{ margin: 0 }}>
+            Stages
+            {stages.length > 0 && <Badge variant="muted">{stages.length}</Badge>}
+          </h2>
+          {stages.length > 0 && (
+            <Button variant="ghost" size="sm" icon={<Plus size={13} />} onClick={() => setCreateOpen(true)}>
+              Add Stage
+            </Button>
+          )}
+        </div>
 
         {stages.length === 0 ? (
           <Card style={{ padding: '52px', textAlign: 'center' }}>
