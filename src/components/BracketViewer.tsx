@@ -121,6 +121,7 @@ export function BracketViewer({ stages, matches, matchGames, participants, onMat
               2: 'rgba(251,191,36,0.6)',
               3: 'rgba(99,102,241,0.7)',
               4: 'rgba(52,211,153,0.5)',
+              5: 'rgba(52,211,153,0.5)', // Archived = same green as Completed
             };
             opponents.style.borderColor = statusColor[status] ?? '';
           }
@@ -171,8 +172,8 @@ export function BracketViewer({ stages, matches, matchGames, participants, onMat
           });
         });
       });
-    }).catch(() => {
-      console.error('Failed to load brackets-viewer from CDN');
+    }).catch((e) => {
+      console.error('[BV] error:', e);
     });
   }, [stages, matches, matchGames, participants, onMatchClick]);
 
