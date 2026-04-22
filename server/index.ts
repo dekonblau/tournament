@@ -402,6 +402,14 @@ app.post('/api/stage/:stageId/reset-seeding', wrap(async (req, res) => {
 // ═════════════════════════════════════════════════════════════════════════════
 app.delete('/api/stage/:id', wrap(async (req, res) => {
   const stageId = Number(req.params.id);
+  const stage = db.prepare('SELECT tournament_id FROM stage WHERE id = ?').get(stageId) as { tournament_id: number } | undefined;
+  if (stage) {
+    const tournament = db.prepare('SELECT started_at FROM tournament WHERE id = ?').get(stage.tournament_id) as { started_at: string | null } | undefined;
+    if (tournament?.started_at) {
+      res.status(409).json({ error: 'Cannot delete a stage from a started tournament' });
+      return;
+    }
+  }
   // Use a direct transaction instead of manager.delete.stage() which issues
   // dozens of individual queries and can exceed nginx proxy timeouts.
   db.transaction(() => {
