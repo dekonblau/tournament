@@ -226,6 +226,9 @@ export const resetSeeding = (stageId: number) =>
 export const deleteStage = (stageId: number) =>
   del<{ ok: true }>(`/api/stage/${stageId}`);
 
+export const createGrandFinalReset = (stageId: number) =>
+  post<{ ok: true }>(`/api/stage/${stageId}/grand-final-reset`);
+
 export const getTournaments = () =>
   get<TournamentRecord[]>('/api/tournaments');
 

@@ -423,6 +423,54 @@ app.delete('/api/stage/:id', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+app.post('/api/stage/:id/grand-final-reset', wrap(async (req, res) => {
+  const stageId = Number(req.params.id);
+
+  const gfGroup = db.prepare(
+    `SELECT * FROM 'group' WHERE stage_id = ? ORDER BY number DESC LIMIT 1`
+  ).get(stageId) as { id: number; number: number } | undefined;
+  if (!gfGroup) { res.status(404).json({ error: 'Stage not found' }); return; }
+
+  const existingRound2 = db.prepare(
+    'SELECT id FROM round WHERE group_id = ? AND number = 2'
+  ).get(gfGroup.id);
+  if (existingRound2) { res.status(409).json({ error: 'Grand final reset match already exists' }); return; }
+
+  const round1 = db.prepare(
+    'SELECT id FROM round WHERE group_id = ? AND number = 1'
+  ).get(gfGroup.id) as { id: number } | undefined;
+  if (!round1) { res.status(404).json({ error: 'Grand final round not found' }); return; }
+
+  const gfMatch = db.prepare('SELECT * FROM match WHERE round_id = ?').get(round1.id) as {
+    status: number; opponent1: string | null; opponent2: string | null;
+  } | undefined;
+  if (!gfMatch || (gfMatch.status ?? 0) < 4) {
+    res.status(409).json({ error: 'Grand final match is not yet complete' }); return;
+  }
+
+  const opp1 = gfMatch.opponent1 ? JSON.parse(gfMatch.opponent1) : null;
+  const opp2 = gfMatch.opponent2 ? JSON.parse(gfMatch.opponent2) : null;
+  if (!opp1 || !opp2) { res.status(409).json({ error: 'Grand final has a BYE slot' }); return; }
+  if (opp1.result !== 'loss') {
+    res.status(409).json({ error: 'WB finalist won the grand final — no reset needed' }); return;
+  }
+
+  db.transaction(() => {
+    const r2 = db.prepare(
+      'INSERT INTO round (stage_id, group_id, number) VALUES (?, ?, 2)'
+    ).run(stageId, gfGroup.id);
+    db.prepare(
+      'INSERT INTO match (stage_id, group_id, round_id, number, child_count, status, opponent1, opponent2) VALUES (?, ?, ?, 1, 0, 2, ?, ?)'
+    ).run(stageId, gfGroup.id, r2.lastInsertRowid,
+      JSON.stringify({ id: opp1.id }),
+      JSON.stringify({ id: opp2.id }),
+    );
+  })();
+
+  exportCache = null;
+  res.json({ ok: true });
+}));
+
 app.post('/api/tournament/:id/start', wrap(async (req, res) => {
   const id = Number(req.params.id);
   const stages = db.prepare('SELECT id FROM stage WHERE tournament_id = ?').all(id) as { id: number }[];
