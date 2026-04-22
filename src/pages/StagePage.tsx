@@ -11,7 +11,6 @@ import { SeedingEditor } from '../components/SeedingEditor';
 import { Tabs, Badge, MatchStatusBadge, Divider, Card } from '../components/ui/index';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../components/ui/index';
-import { createGrandFinalReset } from '../api/client';
 import type { Stage, Round } from 'brackets-model';
 
 type TabId = 'bracket' | 'matches' | 'standings' | 'participants';
@@ -28,7 +27,6 @@ export function StagePage() {
   const [tab, setTab] = useState<TabId>('bracket');
   const [activeMatchId, setActiveMatchId] = useState<number | null>(null);
   const [seedingOpen, setSeedingOpen] = useState(false);
-  const [gfResetLoading, setGfResetLoading] = useState(false);
   const [standings, setStandings] = useState<{ id: number; name: string; rank?: number; points?: number; wins?: number; losses?: number; played?: number }[]>([]);
   const [loadingStandings, setLoadingStandings] = useState(false);
   const [currentMatches, setCurrentMatches] = useState<number[]>([]);
@@ -83,20 +81,7 @@ export function StagePage() {
     }
   };
 
-  const handleCreateGfReset = async () => {
-    setGfResetLoading(true);
-    try {
-      await createGrandFinalReset(sid);
-      await refresh();
-      toast('Grand final reset match created', 'success');
-    } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : 'Failed to create reset match', 'error');
-    } finally {
-      setGfResetLoading(false);
-    }
-  };
-
-  if (!stage || !tournament) {
+if (!stage || !tournament) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '16px', color: 'var(--text-muted)' }}>
         <Swords size={40} style={{ opacity: 0.3 }} />
@@ -110,17 +95,6 @@ export function StagePage() {
   const playableMatches = stageMatches.filter((m) => !(m.opponent1 === null && m.opponent2 === null));
   const done = playableMatches.filter((m) => (m.status ?? 0) >= 4).length;
   const pct = playableMatches.length ? Math.round((done / playableMatches.length) * 100) : 0;
-
-  // Detect grand final reset condition: DE stage, GF first match complete, WB finalist lost, no round 2 yet
-  const gfResetNeeded = stage.type === 'double_elimination' && (() => {
-    if (stageGroups.length < 3) return false;
-    const gfGroup = stageGroups.reduce((max, g) => g.number > max.number ? g : max, stageGroups[0]);
-    const gfMatches = stageMatches.filter((m) => m.group_id === gfGroup.id);
-    if (gfMatches.length !== 1) return false;
-    const gfMatch = gfMatches[0];
-    if ((gfMatch.status ?? 0) < 4) return false;
-    return gfMatch.opponent1 != null && gfMatch.opponent1.result === 'loss';
-  })();
 
   const typeLabel = stage.type === 'single_elimination' ? 'Single Elimination' : stage.type === 'double_elimination' ? 'Double Elimination' : 'Round Robin';
   const typeVariant = stage.type === 'single_elimination' ? 'green' : stage.type === 'double_elimination' ? 'amber' : 'accent';
@@ -173,18 +147,6 @@ export function StagePage() {
             <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{done}/{stageMatches.length} matches</span>
           </div>
         </div>
-
-        {/* Grand final reset banner */}
-        {gfResetNeeded && (
-          <div style={{ padding: '10px 24px', background: 'var(--amber-dim)', borderBottom: '1px solid rgba(251,191,36,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexShrink: 0 }}>
-            <span style={{ fontSize: '13px', color: 'var(--amber)', fontWeight: 500 }}>
-              The WB finalist lost the grand final — a reset match is required.
-            </span>
-            <Button variant="primary" size="sm" loading={gfResetLoading} onClick={handleCreateGfReset}>
-              Add Reset Match
-            </Button>
-          </div>
-        )}
 
         {/* Tabs */}
         <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)', flexShrink: 0 }}>

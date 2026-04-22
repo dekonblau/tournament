@@ -162,8 +162,6 @@ app.post('/api/stage', wrap(async (req, res) => {
 // UPDATE
 // ═════════════════════════════════════════════════════════════════════════════
 app.patch('/api/match', wrap(async (req, res) => {
-  console.log('[route] PATCH /api/match body:', JSON.stringify(req.body));
-
   const { id, opponent1, opponent2, status } = req.body;
 
   // Determine upfront whether this match has a BYE/TBD opponent.
@@ -257,6 +255,46 @@ app.patch('/api/match', wrap(async (req, res) => {
         }
       }
     }
+  }
+
+  // Auto-create grand final reset match for double_elimination stages where
+  // grandFinal:'double' is set and the WB finalist just lost GF round 1.
+  if (id !== undefined) {
+    try {
+      const m = db.prepare('SELECT * FROM match WHERE id = ?').get(id) as {
+        status: number; stage_id: number; group_id: number; round_id: number;
+        opponent1: string | null; opponent2: string | null;
+      } | undefined;
+      if (m && (m.status ?? 0) >= 4) {
+        const round = db.prepare('SELECT number FROM round WHERE id = ?').get(m.round_id) as { number: number } | undefined;
+        const group = db.prepare("SELECT number FROM 'group' WHERE id = ?").get(m.group_id) as { number: number } | undefined;
+        const stage = db.prepare('SELECT type, settings FROM stage WHERE id = ?').get(m.stage_id) as { type: string; settings: string } | undefined;
+        if (stage?.type === 'double_elimination' && round?.number === 1) {
+          const settings = JSON.parse(stage.settings ?? '{}');
+          if (settings.grandFinal === 'double') {
+            const maxGroup = db.prepare("SELECT MAX(number) as n FROM 'group' WHERE stage_id = ?").get(m.stage_id) as { n: number };
+            if (group?.number === maxGroup.n) {
+              const opp1 = m.opponent1 ? JSON.parse(m.opponent1) : null;
+              const opp2 = m.opponent2 ? JSON.parse(m.opponent2) : null;
+              if (opp1?.result === 'loss' && opp2) {
+                const existing = db.prepare('SELECT id FROM round WHERE group_id = ? AND number = 2').get(m.group_id);
+                if (!existing) {
+                  db.transaction(() => {
+                    const r2 = db.prepare('INSERT INTO round (stage_id, group_id, number) VALUES (?, ?, 2)').run(m.stage_id, m.group_id);
+                    db.prepare('INSERT INTO match (stage_id, group_id, round_id, number, child_count, status, opponent1, opponent2) VALUES (?, ?, ?, 1, 0, 2, ?, ?)').run(
+                      m.stage_id, m.group_id, r2.lastInsertRowid,
+                      JSON.stringify({ id: opp1.id }),
+                      JSON.stringify({ id: opp2.id }),
+                    );
+                  })();
+                  exportCache = null;
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch { /* best-effort */ }
   }
 
   res.json({ ok: true });
