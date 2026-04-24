@@ -308,6 +308,16 @@ app.patch('/api/match-game', wrap(async (req, res) => {
 app.patch('/api/seeding/:stageId', wrap(async (req, res) => {
   const stageId = Number(req.params.stageId);
   await manager.update.seeding(stageId, req.body.seeding, req.body.keepSameSize);
+  // The library auto-confirms a fully-filled seeding, immediately setting R1
+  // matches to Ready (status 2). Defer that until the Start Tournament button
+  // is pressed by resetting premature Ready statuses back to Waiting.
+  const stage = db.prepare('SELECT tournament_id FROM stage WHERE id = ?').get(stageId) as { tournament_id: number } | undefined;
+  if (stage) {
+    const tournament = db.prepare('SELECT started_at FROM tournament WHERE id = ?').get(stage.tournament_id) as { started_at: string | null } | undefined;
+    if (!tournament?.started_at) {
+      db.prepare('UPDATE match SET status = 0 WHERE stage_id = ? AND status = 2').run(stageId);
+    }
+  }
   res.json({ ok: true });
 }));
 
@@ -444,8 +454,15 @@ app.delete('/api/stage/:id', wrap(async (req, res) => {
   if (stage) {
     const tournament = db.prepare('SELECT started_at FROM tournament WHERE id = ?').get(stage.tournament_id) as { started_at: string | null } | undefined;
     if (tournament?.started_at) {
-      res.status(409).json({ error: 'Cannot delete a stage from a started tournament' });
-      return;
+      // Allow deletion if all playable matches are already complete (stage is done).
+      // Block only while matches are still in progress.
+      const incomplete = db.prepare(
+        'SELECT COUNT(*) as cnt FROM match WHERE stage_id = ? AND NOT (opponent1 IS NULL AND opponent2 IS NULL) AND status < 4'
+      ).get(stageId) as { cnt: number };
+      if (incomplete.cnt > 0) {
+        res.status(409).json({ error: 'Cannot delete a stage while matches are in progress' });
+        return;
+      }
     }
   }
   // Use a direct transaction instead of manager.delete.stage() which issues

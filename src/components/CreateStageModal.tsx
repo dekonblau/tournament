@@ -103,7 +103,7 @@ export function CreateStageModal({ open, onClose, tournamentId }: Props) {
         settings.consolationFinal = consolationFinal;
         settings.seedOrdering = [seedOrdering];
         settings.balanceByes = balanceByes;
-        if (tbdCount > 0) settings.size = totalSlots;
+        settings.size = totalSlots;
       } else {
         settings.roundRobinMode = rrMode;
         settings.groupCount = groupCount;
