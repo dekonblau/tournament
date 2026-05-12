@@ -37,6 +37,9 @@ export default defineConfig({
     },
   },
   server: {
+    watch: {
+      ignored: ['**/.git/**'],
+    },
     host: '0.0.0.0',
     allowedHosts: ['itadria.net'],
     hmr: {
