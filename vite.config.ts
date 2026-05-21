@@ -38,7 +38,7 @@ export default defineConfig({
   },
   server: {
     watch: {
-      ignored: ['**/.git/**'],
+      ignored: (path: string) => path.includes('/.git/'),
     },
     host: '0.0.0.0',
     allowedHosts: ['itadria.net'],
