@@ -16,6 +16,7 @@
     "brackets-manager": "^1.9.1",
     "brackets-model": "^1.6.2",
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
     "express": "^4.19.2",
     "lucide-react": "^0.383.0",
     "morgan": "^1.10.1",

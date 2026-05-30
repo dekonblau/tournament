@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
 import { BracketsManager } from 'brackets-manager';
@@ -22,6 +23,22 @@ console.log(`[server] SQLite database: ${DB_PATH}`);
 let exportCache: { data: unknown; ts: number } | null = null;
 const EXPORT_TTL_MS = 500;
 app.use((_req, _res, next) => { if (_req.method !== 'GET') exportCache = null; next(); });
+
+// ─── API key auth (mutating requests only) ────────────────────────────────────
+const API_KEY = process.env.API_KEY;
+if (API_KEY) {
+  app.use((req, res, next) => {
+    if (req.method === 'GET') { next(); return; }
+    const provided = req.headers['x-api-key'];
+    if (provided !== API_KEY) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    next();
+  });
+} else {
+  console.warn('[server] WARNING: API_KEY not set — mutating endpoints are unprotected');
+}
 
 // ─── Error handler helper ─────────────────────────────────────────────────────
 function wrap(fn: (req: Request, res: Response) => Promise<unknown>) {
