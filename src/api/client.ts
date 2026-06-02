@@ -6,7 +6,8 @@
 
 // In dev, Vite proxies /api → http://localhost:3001, so we use relative paths.
 // In production, set VITE_API_URL to your server's origin.
-const BASE = import.meta.env.VITE_API_URL ?? '';
+const BASE    = import.meta.env.VITE_API_URL ?? '';
+const API_KEY = import.meta.env.VITE_API_KEY ?? '';
 
 // ─── Core fetch helper ────────────────────────────────────────────────────────
 async function api<T>(
@@ -14,9 +15,13 @@ async function api<T>(
   path: string,
   body?: unknown
 ): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (method !== 'GET' && API_KEY) headers['X-Api-Key'] = API_KEY;
+
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
